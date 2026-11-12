@@ -5,12 +5,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Turbo Karts">
+<meta name="theme-color" content="#1b1f3d">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <title>Turbo Karts</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#9fcff5;font-family:system-ui,"Segoe UI",sans-serif;color:#fff;user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#9fcff5;font-family:system-ui,"Segoe UI",sans-serif;color:#fff;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+  body{position:fixed;inset:0}
   canvas{display:block}
+  body > canvas{position:fixed;inset:0;width:100%!important;height:100%!important}
+  /* veilige randen: notch, klok en thuisbalk */
+  :root{--st:env(safe-area-inset-top,0px);--sr:env(safe-area-inset-right,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px)}
   .shadow{text-shadow:0 3px 0 #0008,0 0 12px #0006}
-  #hud{position:fixed;inset:0;pointer-events:none}
+  #hud{position:fixed;top:var(--st);right:var(--sr);bottom:var(--sb);left:var(--sl);pointer-events:none}
   #pos{position:absolute;left:20px;top:10px;font-size:72px;font-weight:900;font-style:italic}
   #pos small{font-size:28px;opacity:.85}
   #lap{position:absolute;left:24px;top:96px;font-size:22px;font-weight:800}
@@ -27,7 +37,8 @@
   #gear{font-size:16px;font-style:normal;opacity:.85;display:block}
   #big{position:fixed;left:0;right:0;top:32%;text-align:center;font-size:120px;font-weight:900;font-style:italic;pointer-events:none}
   #msg{position:fixed;left:0;right:0;top:20%;text-align:center;font-size:34px;font-weight:900;pointer-events:none}
-  .overlay{position:fixed;inset:0;background:radial-gradient(#0005,#000b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;box-sizing:border-box;overflow:auto}
+  .overlay{position:fixed;inset:0;background:radial-gradient(#0005,#000b);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    padding:calc(16px + var(--st)) calc(16px + var(--sr)) calc(16px + var(--sb)) calc(16px + var(--sl));box-sizing:border-box;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   h1{margin:0;font-size:clamp(40px,8vw,90px);font-style:italic;color:#ffeb3b;text-shadow:0 6px 0 #e65100,0 10px 20px #0008;letter-spacing:2px;text-align:center}
   h2{margin:0;font-size:20px}
   h3{margin:0 0 6px;font-size:18px;opacity:.9}
@@ -86,16 +97,26 @@
   body.touch #itemhint{display:none}
   body.touch #tbar{display:flex;gap:6px;position:absolute;left:50%;transform:translateX(-50%);top:104px;pointer-events:auto}
   .tb{font-size:12px;font-weight:800;padding:6px 11px;background:#0009;color:#fff;box-shadow:none;border-radius:14px;white-space:nowrap}
-  body.touch #tLeft{display:flex;gap:14px;position:absolute;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));pointer-events:auto}
+  body.touch #tLeft{display:flex;gap:14px;position:absolute;left:18px;bottom:18px;pointer-events:auto}
   body.touch.tilt #tLeft{display:none}
-  body.touch #tRight{display:grid;grid-template-columns:auto auto;gap:10px;align-items:end;justify-items:center;position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));pointer-events:auto}
+  body.touch #tRight{display:grid;grid-template-columns:auto auto;gap:10px;align-items:end;justify-items:center;position:absolute;right:18px;bottom:18px;pointer-events:auto}
   .tbtn{width:86px;height:86px;border-radius:50%;padding:0;font-size:32px;font-weight:900;font-style:normal;background:#ffffff2e;color:#fff;
     border:3px solid #ffffffb0;box-shadow:0 4px 0 #0005;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   .tbtn.sm{width:64px;height:64px;font-size:15px}
   .tbtn.drift{font-size:12px;background:#40c4ff55}
   .tbtn.gas{width:102px;height:102px;font-size:21px;background:#69f0ae66}
   .tbtn.on{background:#ffffffa0;color:#222;transform:scale(.93)}
-  body.touch #speed{right:auto;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));font-size:34px;text-align:center}
+  body.touch #speed{right:auto;left:50%;transform:translateX(-50%);bottom:12px;font-size:34px;text-align:center}
+  /* telefoon rechtop: knoppen onderaan, snelheid erboven, knoppenbalk onder de stand */
+  @media (orientation:portrait){
+    html body.touch #speed{bottom:auto;top:150px;font-size:26px}
+    html body.touch #tbar{top:122px;flex-wrap:wrap;justify-content:center;width:calc(100% - 24px)}
+    body.touch #tLeft{gap:10px;left:12px;bottom:14px}
+    body.touch #tRight{gap:8px;right:12px;bottom:14px}
+    #mm{opacity:.85}
+  }
+  #rotate{display:none}
+  @media (orientation:portrait){ body.touch.racing #rotate{display:block;position:fixed;left:0;right:0;top:calc(var(--st) + 190px);text-align:center;font-size:13px;font-weight:800;opacity:.85;pointer-events:none} }
   body.touch #gear{display:none}
   canvas{touch-action:none}
   @media (max-width:760px),(max-height:520px){
@@ -140,6 +161,7 @@
     <button class="tbtn gas" data-k="ArrowUp" aria-label="Gas">GAS</button>
   </div>
 </div>
+<div id="rotate" class="shadow">🔄 Draai je telefoon liggend voor een groter beeld</div>
 <div id="big" class="shadow"></div>
 <div id="msg" class="shadow"></div>
 
@@ -278,8 +300,16 @@ const ANISO = renderer.capabilities.getMaxAnisotropy();
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xffffff, 2500, 10000);
 const camera = new THREE.PerspectiveCamera(70, 1, 1, 40000);
-function resize(){ renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }
-addEventListener('resize', resize); resize();
+function resize(){
+  const w = document.documentElement.clientWidth || innerWidth, h = document.documentElement.clientHeight || innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+// rechtop: ruimer beeld zodat je niet te ver ingezoomd zit
+const fovFix = f => camera.aspect < 1 ? Math.min(100, f*(1 + (1-camera.aspect)*0.7)) : f;
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => { resize(); setTimeout(resize, 300); setTimeout(resize, 800); });
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
+resize();
 const hemi = new THREE.HemisphereLight(0xffffff, 0x556644, 0.7); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
 sun.castShadow = true; sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
@@ -815,7 +845,7 @@ function setupRace(){
 }
 function loadTrack(k){ if (currentTrack !== k) buildTrack(k); }
 function raceUI(){
-  for (const id of ['menu','results','podium']) $(id).hidden = true;
+  for (const id of ['menu','results','podium']) $(id).hidden = true; document.body.classList.add('racing');
   $('hud').hidden = false; $('msg').textContent = ''; $('big').textContent = '';
   $('trackname').textContent = (isCup() ? '🏆 Race ' + (cupIdx+1) + '/4 · ' : '🏁 ') + TR.emoji + ' ' + TR.name + (net.role ? ' · 🌐 online' : '');
 }
@@ -827,7 +857,7 @@ function startRace(){
 }
 function startCup(){ cupIdx = 0; cupPts = {}; for (const d of DRIVERS) cupPts[d.name] = 0; startRace(); }
 function toMenu(){
-  state = 'menu'; for (const id of ['results','podium','hud']) $(id).hidden = true; $('menu').hidden = false; $('big').textContent = '';
+  state = 'menu'; document.body.classList.remove('racing'); for (const id of ['results','podium','hud']) $(id).hidden = true; $('menu').hidden = false; $('big').textContent = '';
   loadTrack(isCup() ? 0 : menuTrack); setupRace(); buildMenu();
   if (net.role === 'host'){ broadcast({ t:'menu' }); sendLobby(); }
 }
@@ -1352,7 +1382,7 @@ function showResults(){
   renderResults(data);
 }
 function renderResults(data){
-  state = 'done'; $('big').textContent = '';
+  state = 'done'; document.body.classList.remove('racing'); $('big').textContent = '';
   const order = data.order.map(n => cars.find(c => c.name === n)).filter(Boolean), place = data.order.indexOf(player.name) + 1;
   if (net.role === 'client'){ cupPts = data.pts; cupIdx = data.cupIdx; }
   $('resTitle').textContent = place === 1 ? '🏆 GEWONNEN!' : place <= 3 ? 'Podium! Plek ' + place : 'Plek ' + place;
@@ -1373,7 +1403,7 @@ function renderResults(data){
 // ================= Prijsuitreiking =================
 let podiumCenter = null;
 function startPodium(){
-  state = 'podium'; podiumT = 0;
+  state = 'podium'; podiumT = 0; document.body.classList.remove('racing');
   for (const id of ['results','hud']) $(id).hidden = true;
   for (const b of balls) scene.remove(b.m); balls = [];
   const st = [...DRIVERS].sort((a, b) => cupPts[b.name] - cupPts[a.name]);
@@ -1563,11 +1593,11 @@ function updateCamera(dt){
   if (state === 'menu'){
     const a = simT*0.12, p = P(2);
     camera.position.set(p.x + Math.cos(a)*300, p.h + 90, p.y + Math.sin(a)*300); camera.lookAt(p.x, p.h + 15, p.y);
-    camera.fov = 55; camera.updateProjectionMatrix(); fx = p.x; fy = p.h; fz = p.y;
+    camera.fov = fovFix(55); camera.updateProjectionMatrix(); fx = p.x; fy = p.h; fz = p.y;
   } else if (state === 'podium'){
     const c = podiumCenter, a = Math.sin(podiumT*0.35)*0.6, dist = 230;
     camera.position.set(c.x + (c.d.x*Math.cos(a) + c.n.x*Math.sin(a))*dist, c.y + 75, c.z + (c.d.y*Math.cos(a) + c.n.y*Math.sin(a))*dist);
-    camera.lookAt(c.x, c.y + 45, c.z); camera.fov = 55; camera.updateProjectionMatrix(); fx = c.x; fy = c.y; fz = c.z;
+    camera.lookAt(c.x, c.y + 45, c.z); camera.fov = fovFix(55); camera.updateProjectionMatrix(); fx = c.x; fy = c.y; fz = c.z;
   } else {
     camH += wrap(player.h - camH)*Math.min(1, dt*4.5);
     camTgt.set(player.x - Math.cos(camH)*120, player.z + 46, player.y - Math.sin(camH)*120);
@@ -1576,7 +1606,7 @@ function updateCamera(dt){
     const sh = shake*6 + (player.dist > ROAD/2+CURB ? Math.min(1, Math.abs(player.vf)/400)*1.5 : 0) + (player.boostT > 0 ? 0.8 : 0);
     camera.position.x += (Math.random()-.5)*sh; camera.position.y += (Math.random()-.5)*sh;
     camera.lookAt(player.x + Math.cos(camH)*70, player.z + 20, player.y + Math.sin(camH)*70);
-    const fov = 64 + Math.min(1, Math.abs(player.vf)/640)*8 + (player.boostT > 0 ? 10 : 0);
+    const fov = fovFix(64 + Math.min(1, Math.abs(player.vf)/640)*8 + (player.boostT > 0 ? 10 : 0));
     camera.fov += (fov - camera.fov)*Math.min(1, dt*4); camera.updateProjectionMatrix();
     fx = player.x; fy = player.z; fz = player.y;
   }
