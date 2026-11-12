@@ -56,6 +56,12 @@
   .bar{flex:1;height:7px;background:#0005;border-radius:4px;overflow:hidden}
   .bar i{display:block;height:100%;background:#69f0ae}
   #modes{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  #vehicles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .vcard{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:14px;background:#ffffff22;border:3px solid transparent;cursor:pointer;text-align:left}
+  .vcard.sel{border-color:#ffeb3b;background:#ffffff38}
+  .vcard .vi{font-size:30px}
+  .vcard b{display:block;font-size:16px}
+  .vcard small{font-size:11px;opacity:.85}
   .mode{font-size:19px;padding:10px 22px;border-radius:16px;background:#ffffff22;color:#fff;box-shadow:none;border:3px solid transparent}
   .mode.sel{border-color:#ffeb3b;background:#ffffff38}
   .mode small{display:block;font-size:12px;font-weight:600;opacity:.85}
@@ -181,6 +187,7 @@
   <h1>TURBO KARTS</h1>
   <h2 class="shadow">Kies je coureur</h2>
   <div id="drivers"></div>
+  <div id="vehicles"></div>
   <h2 class="shadow">Wat wil je rijden?</h2>
   <div id="modes">
     <button class="mode sel" data-m="cup">🏆 Kampioenschap<small>4 banen, punten per plek</small></button>
@@ -796,6 +803,57 @@ const carbon = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.6,
 const chrome = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.2 });
 const visorMat = new THREE.MeshStandardMaterial({ color: 0x101820, metalness: 0.5, roughness: 0.1 });
 const headMat = new THREE.MeshBasicMaterial({ color: 0xfffde7 });
+const bikeTireGeo = new THREE.CylinderGeometry(9.5, 9.5, 5, 18), bikeRimGeo = new THREE.CylinderGeometry(5.5, 5.5, 5.6, 12);
+// staaf tussen twee punten (voor armen, benen en de voorvork)
+function limb(parent, mat, r, a, b){
+  const dx = b[0]-a[0], dy = b[1]-a[1], len = Math.hypot(dx, dy);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r*0.9, len, 8), mat);
+  m.position.set((a[0]+b[0])/2, (a[1]+b[1])/2, a[2]); m.rotation.z = Math.atan2(dy, dx) - Math.PI/2; parent.add(m); return m;
+}
+function makeBikeMesh(d){
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body); root.rotation.order = 'YXZ';
+  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.4, roughness: 0.3 });
+  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).multiplyScalar(0.7), roughness: 0.8 });
+  const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const wheels = [], fronts = [];
+  for (const x of [21, -19]){
+    const pivot = new THREE.Group(); pivot.position.set(x, 9.5, 0); body.add(pivot);
+    const spin = new THREE.Group(); pivot.add(spin);
+    const t = new THREE.Mesh(bikeTireGeo, tireMat); t.rotation.x = Math.PI/2; spin.add(t);
+    const r = new THREE.Mesh(bikeRimGeo, rimMat); r.rotation.x = Math.PI/2; spin.add(r);
+    wheels.push(spin);
+    if (x > 0){ fronts.push(pivot); limb(pivot, chrome, 1.4, [0, 0, 3.5], [-6, 16, 3.5]); limb(pivot, chrome, 1.4, [0, 0, -3.5], [-6, 16, -3.5]); }
+  }
+  limb(body, carbon, 3, [-19, 9.5, 0], [-2, 13, 0]);                 // achterbrug
+  add(new THREE.BoxGeometry(26, 7, 7), carbon, 2, 15, 0);              // frame
+  add(new THREE.BoxGeometry(14, 6, 9), carbon, 0, 10, 0);              // motorblok
+  add(new THREE.BoxGeometry(16, 9, 13), paint, 6, 21, 0);              // tank
+  const fairing = add(new THREE.BoxGeometry(11, 15, 13), paint, 16, 21, 0); fairing.rotation.z = -0.4;   // voorkuip
+  add(new THREE.BoxGeometry(5, 6, 10), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, metalness: .3, roughness: .1, transparent: true, opacity: .7 }), 20, 29, 0);  // windscherm
+  add(new THREE.BoxGeometry(2, 3, 5), headMat, 22.5, 19, 0);           // koplamp
+  add(new THREE.BoxGeometry(14, 4, 10), carbon, -6, 22, 0);            // zadel
+  const tail = add(new THREE.BoxGeometry(12, 6, 9), paint, -16, 22, 0); tail.rotation.z = 0.25;
+  const ex = add(new THREE.CylinderGeometry(2, 2.4, 16, 8), chrome, -14, 12, 6); ex.rotation.z = Math.PI/2 - 0.2;   // uitlaat
+  add(new THREE.BoxGeometry(3, 2, 22), carbon, 13, 28, 0);             // stuur
+  // rijder, voorovergebogen
+  const torso = limb(body, suit, 6, [-5, 25, 0], [5, 34, 0]); torso.scale.set(1, 1, 1.15);
+  add(new THREE.SphereGeometry(8, 16, 12), paint, 9, 38, 0);
+  add(new THREE.BoxGeometry(5, 5, 10), visorMat, 15.5, 38.5, 0);
+  add(new THREE.BoxGeometry(16, 1.4, 16.4), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .5 }), 9, 42.5, 0);
+  for (const s of [-1, 1]){
+    limb(body, suit, 2.1, [4, 33, s*6.5], [13, 28.5, s*9]);             // arm
+    limb(body, suit, 2.8, [-5, 25, s*6], [5, 18, s*8]);                  // bovenbeen
+    limb(body, suit, 2.3, [5, 18, s*8], [-1, 9, s*8]);                   // onderbeen
+  }
+  const flame = add(new THREE.ConeGeometry(3.5, 20, 10), new THREE.MeshBasicMaterial({ color: 0xff9100 }), -28, 12, 6); flame.rotation.z = Math.PI/2;
+  const sparkMat = new THREE.MeshBasicMaterial({ color: 0x40c4ff });
+  const sparks = [add(new THREE.SphereGeometry(3.5, 8, 6), sparkMat, -19, 2, 5), add(new THREE.SphereGeometry(3.5, 8, 6), sparkMat, -19, 2, -5)];
+  shadows(body, true, false); flame.castShadow = false; sparks.forEach(s => s.castShadow = false);
+  const shield = new THREE.Mesh(new THREE.SphereGeometry(36, 18, 12), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
+  shield.position.y = 20; root.add(shield);
+  scene.add(root);
+  return { root, body, flame, sparks, sparkMat, shield, wheels, fronts, bike: true };
+}
 function makeKartMesh(d){
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body); root.rotation.order = 'YXZ';
   const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.35, roughness: 0.35 });
@@ -841,13 +899,22 @@ let cars = [], player, state = 'menu', cd = 0, raceTime = 0, finishOrder = [], b
 let mode = 'cup', menuTrack = 0, cupIdx = 0, cupPts = {}, podiumT = 0;
 let camH = 0, shake = 0; const camPos = new THREE.Vector3(), camTgt = new THREE.Vector3();
 
-function makeCar(d, ai, skill, gridIdx, side){
+// voertuigen: de motor is wendbaarder en trekt sneller op, maar is lichter bij botsingen
+const VEHICLES = {
+  kart: { name: 'Kart', icon: '🏎️', desc: 'Stevig, duwt anderen weg', top: 1, acc: 1, turn: 1, mass: 1 },
+  bike: { name: 'Motor', icon: '🏍️', desc: 'Wendbaar en snel weg, maar licht', top: 0.97, acc: 1.08, turn: 1.12, mass: 0.7 },
+};
+const AI_BIKES = new Set([1, 4]);   // Luna en Rico rijden als computerspeler op een motor
+let vehicle = 'kart'; try { if (localStorage.getItem('turbokarts_vehicle') === 'bike') vehicle = 'bike'; } catch(e){}
+function makeCar(d, ai, skill, gridIdx, side, veh = 'kart'){
+  const V = VEHICLES[veh] || VEHICLES.kart;
+  d = { ...d, top: d.top*V.top, acc: d.acc*V.acc, turn: d.turn*V.turn, vehicle: veh, mass: V.mass };
   const dd = dir(gridIdx), p = P(gridIdx);
   return { ...d, ai, skill, x: p.x - dd.y*side, y: p.y + dd.x*side, z: p.h, vz: 0, air: false, slope: 0, slopeVis: 0,
     h: Math.atan2(dd.y, dd.x), vx:0, vy:0, vf:0, vr:0, steerSm:0,
     idx: ((gridIdx%N)+N)%N, total: gridIdx-N, maxFloor:-1, dist:0, lapStart:0, lastLap:null, best:null, finished:false, finishTime:0,
     phase: Math.random()*6, rubber:1, drifting:false, driftDir:0, charge:0, hopT:0, boostT:0, spinT:0, spinA:0, yawVis:0, shieldT:0,
-    item:null, itemCount:0, rollT:0, aiUseT:0, roll:0, pitch:0, prevVf:0, wheelA:0, emitT:0, prevW:null, mesh: makeKartMesh(d) };
+    item:null, itemCount:0, rollT:0, aiUseT:0, roll:0, pitch:0, prevVf:0, wheelA:0, emitT:0, prevW:null, stallT:0, gasAt:null, mesh: veh === 'bike' ? makeBikeMesh(d) : makeKartMesh(d) };
 }
 function clearRace(){
   for (const c of cars) scene.remove(c.mesh.root);
@@ -865,15 +932,16 @@ function setupRace(){
   const skills = [0.97, 0.95, 0.93, 0.91, 0.89];
   const grid = [[N-2,-48],[N-2,48],[N-5,-48],[N-5,48],[N-8,-48],[N-8,48]];
   cars = [];
-  ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i], grid[i][0], grid[i][1])));
-  humans.forEach((h, i) => { const g = grid[ais.length + i], c = makeCar(DRIVERS[h.d], false, 0.9, g[0], g[1]); c.owner = h.id; c.itemSeen = 0; cars.push(c); });
+  ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i], grid[i][0], grid[i][1], AI_BIKES.has(di) ? 'bike' : 'kart')));
+  humans.forEach((h, i) => { const g = grid[ais.length + i], c = makeCar(DRIVERS[h.d], false, 0.9, g[0], g[1], h.v || (net.role ? 'kart' : vehicle)); c.owner = h.id; c.itemSeen = 0; cars.push(c); });
   player = cars.find(c => c.owner === (net.role ? net.myId : 'local')) || cars[cars.length-1];
   camH = player.h; camPos.set(player.x - Math.cos(camH)*120, player.z + 48, player.y - Math.sin(camH)*120);
 }
 function loadTrack(k){ if (currentTrack !== k) buildTrack(k); }
 function raceUI(){
   for (const id of ['menu','results','podium']) $(id).hidden = true; document.body.classList.add('racing');
-  $('hud').hidden = false; $('msg').textContent = ''; $('big').textContent = '';
+  $('hud').hidden = false; $('big').textContent = '';
+  showMsg('Tip: geef gas als de 1 verschijnt voor een 🚀 raketstart'); msgT = 3;
   $('trackname').textContent = (isCup() ? '🏆 Race ' + (cupIdx+1) + '/4 · ' : '🏁 ') + TR.emoji + ' ' + TR.name + (net.role ? ' · 🌐 online' : '');
 }
 function startRace(){
@@ -908,7 +976,7 @@ function hostGame(){
   const code = Array.from({ length: 4 }, () => CODE_CHARS[Math.random()*CODE_CHARS.length | 0]).join('');
   const peer = new Peer('turbokarts-' + code);
   peer.on('open', () => {
-    Object.assign(net, { role:'host', peer, code, myId:'host', conns:[], inputs:{}, roster:[{ id:'host', d: selected }] });
+    Object.assign(net, { role:'host', peer, code, myId:'host', conns:[], inputs:{}, roster:[{ id:'host', d: selected, v: vehicle }] });
     netStatus(''); setupRace(); buildMenu();
   });
   peer.on('error', e => { if (e.type === 'unavailable-id'){ peer.destroy(); hostGame(); } else if (!net.role) netStatus('Er ging iets mis: ' + e.type); });
@@ -917,7 +985,7 @@ function hostGame(){
       if (state !== 'menu' || net.roster.length >= DRIVERS.length){ conn.send({ t:'full' }); setTimeout(() => conn.close(), 400); return; }
       net.conns.push(conn);
       const used = new Set(net.roster.map(r => r.d));
-      net.roster.push({ id: conn.peer, d: DRIVERS.findIndex((_, i) => !used.has(i)) });
+      net.roster.push({ id: conn.peer, d: DRIVERS.findIndex((_, i) => !used.has(i)), v: 'kart' });
       sendLobby(); setupRace(); buildMenu();
     });
     conn.on('data', m => hostOnMsg(conn, m));
@@ -933,7 +1001,7 @@ function joinGame(){
   peer.on('open', id => {
     const conn = peer.connect('turbokarts-' + code, { reliable: true, serialization: 'json' });
     const to = setTimeout(() => { if (!conn.open){ netStatus('Geen spel gevonden met code ' + code); peer.destroy(); } }, 9000);
-    conn.on('open', () => { clearTimeout(to); Object.assign(net, { role:'client', peer, host: conn, code, myId: id }); netStatus(''); conn.send({ t:'driver', d: selected }); buildMenu(); });
+    conn.on('open', () => { clearTimeout(to); Object.assign(net, { role:'client', peer, host: conn, code, myId: id }); netStatus(''); conn.send({ t:'driver', d: selected, v: vehicle }); buildMenu(); });
     conn.on('data', clientOnMsg);
     conn.on('close', () => { if (net.role === 'client') leaveOnline('De host heeft het spel verlaten'); });
   });
@@ -957,13 +1025,13 @@ function dropPeer(id){
 }
 function hostOnMsg(conn, m){
   if (m.t === 'in') net.inputs[conn.peer] = m;
-  if (m.t === 'driver' && state === 'menu'){ setDriver(conn.peer, m.d); sendLobby(); setupRace(); buildMenu(); }
+  if (m.t === 'driver' && state === 'menu'){ setDriver(conn.peer, m.d); const r = net.roster.find(r => r.id === conn.peer); if (r) r.v = m.v === 'bike' ? 'bike' : 'kart'; sendLobby(); setupRace(); buildMenu(); }
 }
 function clientOnMsg(m){
   if (m.t === 'full'){ leaveOnline('Dit spel is vol of de race is al bezig'); return; }
   if (m.t === 'lobby'){
     net.roster = m.roster; net.sub = m.sub; menuTrack = m.track;
-    const me = m.roster.find(r => r.id === net.myId); if (me) selected = me.d;
+    const me = m.roster.find(r => r.id === net.myId); if (me){ selected = me.d; if (me.v) vehicle = me.v; }
     if (state === 'menu'){ loadTrack(isCup() ? 0 : menuTrack); setupRace(); buildMenu(); }
   }
   if (m.t === 'start'){
@@ -974,6 +1042,7 @@ function clientOnMsg(m){
   if (m.t === 'results') renderResults(m);
   if (m.t === 'podium'){ cupPts = m.pts; startPodium(); }
   if (m.t === 'menu') toMenu();
+  if (m.t === 'msg') showMsg(m.text);
 }
 const r2 = v => Math.round(v*100)/100;
 function makeSnap(){
@@ -1070,13 +1139,20 @@ function buildMenu(){
     el.onclick = () => chooseDriver(i);
     box.appendChild(el);
   });
+  const vb = $('vehicles'); vb.innerHTML = '';
+  for (const [key, V] of Object.entries(VEHICLES)){
+    const el = document.createElement('div'); el.className = 'vcard' + (key === vehicle ? ' sel' : '');
+    el.innerHTML = `<span class="vi">${V.icon}</span><span><b>${V.name}</b><small>${V.desc}</small></span>`;
+    el.onclick = () => chooseVehicle(key);
+    vb.appendChild(el);
+  }
   document.querySelectorAll('#modes .mode').forEach(b => b.classList.toggle('sel', b.dataset.m === mode));
   const on = mode === 'online';
   $('online').hidden = !on; $('onStart').hidden = !!net.role; $('onLobby').hidden = !net.role;
   if (net.role){
     $('onCode').innerHTML = 'Spelcode:<b>' + net.code + '</b>' + (net.role === 'host' ? '<br><small>Geef deze code aan je vrienden, zij kiezen "Meedoen"</small>' : '');
     $('onPlayers').innerHTML = net.roster.map(r => { const d = DRIVERS[r.d] || DRIVERS[0];
-      return `<span class="pl" style="border:2px solid ${d.css}">${d.face} ${d.name}${r.id === 'host' ? ' 👑' : ''}${r.id === net.myId ? ' (jij)' : ''}</span>`; }).join('')
+      return `<span class="pl" style="border:2px solid ${d.css}">${d.face} ${d.name} ${(VEHICLES[r.v] || VEHICLES.kart).icon}${r.id === 'host' ? ' 👑' : ''}${r.id === net.myId ? ' (jij)' : ''}</span>`; }).join('')
       + `<span class="pl" style="opacity:.7">+ ${DRIVERS.length - net.roster.length} computer</span>`;
     $('onHostOpts').hidden = net.role !== 'host'; $('onWait').hidden = net.role !== 'client';
     if (net.role === 'client') $('onWait').textContent = 'Wachten tot de host start… (' + (net.sub === 'cup' ? '🏆 kampioenschap' : '🏁 ' + TRACKS[menuTrack].name) + ')';
@@ -1147,8 +1223,14 @@ function autoJoinFromLink(){
   const tryJoin = (n) => { if (typeof Peer !== 'undefined') joinGame(); else if (n > 0) setTimeout(() => tryJoin(n-1), 500); else netStatus('Online spelen kon niet laden. Heb je internet?'); };
   tryJoin(20);
 }
+function chooseVehicle(v){
+  vehicle = v; try { localStorage.setItem('turbokarts_vehicle', v); } catch(e){}
+  if (net.role === 'client') net.host.send({ t:'driver', d: selected, v });
+  if (net.role === 'host'){ const r = net.roster.find(r => r.id === 'host'); if (r) r.v = v; sendLobby(); }
+  setupRace(); buildMenu();
+}
 function chooseDriver(i){
-  if (net.role === 'client'){ net.host.send({ t:'driver', d: i }); return; }
+  if (net.role === 'client'){ net.host.send({ t:'driver', d: i, v: vehicle }); return; }
   if (net.role === 'host'){ if (!setDriver('host', i)) return; sendLobby(); }
   selected = i; setupRace(); buildMenu();
 }
@@ -1276,7 +1358,7 @@ $('tMenu').onclick = () => net.role === 'client' ? leaveOnline() : toMenu();
 function playerInput(){
   const braking = keys.ArrowDown || keys.KeyS;
   const steerKeys = ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0);
-  return { up: keys.ArrowUp || keys.KeyW || (autoGas && usingTouch() && !braking), down: braking, drift: keys.Space || keys.ShiftLeft || keys.ShiftRight,
+  return { up: keys.ArrowUp || keys.KeyW || (autoGas && usingTouch() && !braking && state !== 'countdown'), down: braking, drift: keys.Space || keys.ShiftLeft || keys.ShiftRight,
     steer: steerKeys || (tiltOn ? tiltSteer : 0) };
 }
 function aiInput(c, t){
@@ -1344,6 +1426,7 @@ function driftLogic(c, inp, dt){
   }
 }
 function physics(c, inp, dt){
+  if (c.stallT > 0){ c.stallT -= dt; inp = { ...inp, up: false }; }   // afgeslagen motor na te vroeg gas
   if (c.spinT > 0) inp = { up:false, down:false, steer:0, drift:false };
   const fx = Math.cos(c.h), fy = Math.sin(c.h), rx = -fy, ry = fx;
   let vf = c.vx*fx + c.vy*fy, vr = c.vx*rx + c.vy*ry;
@@ -1523,7 +1606,8 @@ function collisions(){
       const nx = dx/d, ny = dy/d, o = (32-d)/2;
       a.x -= nx*o; a.y -= ny*o; b.x += nx*o; b.y += ny*o;
       const rv = (b.vx-a.vx)*nx + (b.vy-a.vy)*ny;
-      if (rv < 0){ const imp = -1.3*rv/2; a.vx -= imp*nx; a.vy -= imp*ny; b.vx += imp*nx; b.vy += imp*ny;
+      if (rv < 0){ const imp = -1.3*rv, ma = a.mass || 1, mb = b.mass || 1, ka = imp*mb/(ma+mb), kb = imp*ma/(ma+mb);   // lichtere motor vliegt verder weg
+        a.vx -= ka*nx; a.vy -= ka*ny; b.vx += kb*nx; b.vy += kb*ny;
         if ((a === player || b === player) && rv < -100){ sfx.bump(); shake = Math.min(1, -rv/500); } }
     }
   }
@@ -1532,6 +1616,23 @@ function ranking(){
   return [...cars].sort((a,b) => (a.finished && b.finished) ? a.finishTime-b.finishTime : a.finished ? -1 : b.finished ? 1 : b.total-a.total);
 }
 
+// bericht aan één speler (lokaal, of via het netwerk naar die speler)
+function notify(c, text){
+  if (c === player) showMsg(text);
+  else if (net.role === 'host' && c.owner){ const conn = net.conns.find(x => x.peer === c.owner); if (conn && conn.open) conn.send({ t:'msg', text }); }
+}
+// cd-waarde bij het indrukken: 3 = (2.5..3.5], 2 = (1.5..2.5], 1 = (0.5..1.5]
+function rocketStarts(){
+  for (const c of cars){
+    let g = c.gasAt;
+    if (c.ai){ const r = Math.random(); g = r < c.skill*0.45 ? 1 : r < 0.8 ? 2 : null; }
+    c.gasAt = null;
+    if (g == null) continue;
+    if (g <= 1.5){ boost(c, 1.3); notify(c, '🚀 RAKETSTART!'); }
+    else if (g <= 2.5){ boost(c, 0.5); notify(c, '👍 Goede start'); }
+    else { c.stallT = 1.1; notify(c, '💨 Te vroeg! Motor afgeslagen'); if (c === player) sfx.bump(); }
+  }
+}
 function effects(c, dt){
   if (c.air) { c.prevW = null; }
   const fx = Math.cos(c.h), fy = Math.sin(c.h), rx = -fy, ry = fx, y = c.z + 1.45;
@@ -1541,6 +1642,7 @@ function effects(c, dt){
   if (sliding && !off){ if (c.prevW) for (let k = 0; k < 2; k++) addSkid(c.prevW[k][0], c.prevW.y, c.prevW[k][1], rear[k][0], y, rear[k][1]); c.prevW = rear; c.prevW.y = y; }
   else c.prevW = null;
   c.emitT -= dt;
+  if (c.stallT > 0 && c.emitT <= 0) emit(c.x - Math.cos(c.h)*28, c.z+14, c.y - Math.sin(c.h)*28, (Math.random()-.5)*30, 40, (Math.random()-.5)*30, 1.0, 10, 40, 0x555555, 0.6);
   if (c.emitT <= 0){
     c.emitT = 0.045;
     const ice = P(c.idx).ice;
@@ -1574,7 +1676,15 @@ function update(dt){
 
   if (msgT > 0){ msgT -= dt; if (msgT <= 0) $('msg').textContent = ''; }
   if (net.role === 'client'){ clientUpdate(dt); return; }
-  if (state === 'countdown'){ cd -= dt; if (cd <= 0.5){ state = 'race'; raceTime = 0; } }
+  if (state === 'countdown'){
+    // raketstart: onthoud wanneer elke speler het gas indrukte
+    for (const c of cars) if (!c.ai){
+      const up = c === player ? playerInput().up : !!(net.inputs[c.owner] || {}).up;
+      if (up){ if (c.gasAt == null) c.gasAt = cd; } else c.gasAt = null;
+    }
+    cd -= dt;
+    if (cd <= 0.5){ state = 'race'; raceTime = 0; rocketStarts(); }
+  }
   countdownUI();
   if (state === 'race' && firstFin != null && raceTime - firstFin > 30) endRace();   // niet eeuwig wachten op de laatste speler
 
@@ -1628,7 +1738,9 @@ function syncKart(c, dt){
   M.root.position.set(c.x, c.z + 1.2 + Math.sin(Math.min(1, c.hopT/0.25)*Math.PI)*9 + (c.dist > ROAD/2+CURB && !c.air ? Math.random()*0.8 : 0), c.y);
   M.root.rotation.set(0, -c.h, c.slopeVis);
   c.yawVis += ((c.drifting ? c.driftDir*0.38 : clamp(c.vr/400, -0.25, 0.25)) - c.yawVis)*Math.min(1, dt*8);
-  M.body.rotation.set(c.roll, -(c.yawVis + c.spinA), c.pitch);
+  // motor hangt schuin de bocht in, een kart helt een beetje over
+  const lean = M.bike ? clamp(c.steerSm*Math.min(1, Math.abs(c.vf)/350)*0.55 + (c.drifting ? c.driftDir*0.15 : 0), -0.7, 0.7) : c.roll;
+  M.body.rotation.set(lean, -(c.yawVis + c.spinA), c.pitch);
   c.wheelA -= c.vf*dt/7.5;
   for (const w of M.wheels) w.rotation.z = c.wheelA;
   for (const f of M.fronts) f.rotation.y = -c.steerSm*0.45;
@@ -1712,7 +1824,9 @@ function loop(t){
   for (const c of cars) syncKart(c, dt);
   updateCamera(dt); drawHUD();
   if (engGain && player){
-    const gi = gearInfo(player), f = 38 + gi.rpm*105 + (player.boostT > 0 ? 15 : 0);
+    const gi = gearInfo(player);
+    if (state === 'countdown' && playerInput().up) gi.rpm = 0.75 + Math.sin(simT*30)*0.08;   // motor laten brullen voor de start
+    const f = 38 + gi.rpm*105 + (player.boostT > 0 ? 15 : 0);
     engGain.gain.value = (muted || state === 'menu' || state === 'podium') ? 0 : 0.028 + gi.rpm*0.02*(keys.ArrowUp || keys.KeyW ? 1 : 0.4);
     eng.frequency.value = f; eng2.frequency.value = f/2; engFilter.frequency.value = 400 + gi.rpm*900;
   }
