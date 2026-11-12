@@ -43,9 +43,9 @@
   h2{margin:0;font-size:20px}
   h3{margin:0 0 6px;font-size:18px;opacity:.9}
   #drivers,#tracks{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:900px}
-  .card{width:112px;padding:10px;border-radius:16px;background:#ffffff22;border:3px solid transparent;cursor:pointer;text-align:center;transition:transform .1s}
+  .card{width:112px;padding:10px;border-radius:16px;background:#0000006b;border:3px solid transparent;cursor:pointer;text-align:center;transition:transform .1s}
   .card:hover{transform:translateY(-3px)}
-  .card.sel{border-color:#ffeb3b;background:#ffffff38;transform:scale(1.05)}
+  .card.sel{border-color:#ffeb3b;background:#00000099;transform:scale(1.05)}
   .face{width:54px;height:54px;border-radius:50%;margin:0 auto 6px;border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:30px}
   .card b{display:block;font-size:17px}
   .card .rec{font-size:11px;opacity:.85;margin-top:3px}
@@ -57,14 +57,28 @@
   .bar i{display:block;height:100%;background:#69f0ae}
   #modes{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
   #vehicles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  #steps{display:flex;gap:6px;background:#0006;padding:5px;border-radius:999px}
+  .step{display:flex;align-items:center;gap:7px;font-size:15px;padding:7px 16px 7px 8px;border-radius:999px;background:transparent;color:#ffffffb0;box-shadow:none}
+  .step i{font-style:normal;width:24px;height:24px;border-radius:50%;background:#ffffff26;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .step em{font-style:normal;font-size:13px;opacity:.9}
+  .step.cur{background:#ffeb3b;color:#3a2a00} .step.cur i{background:#3a2a0026}
+  .step.done{color:#fff} .step.done i{background:#69f0ae;color:#063}
+  .step:active{transform:none;box-shadow:none}
+  .mstep{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:920px;animation:stepIn .18s ease-out}
+  @keyframes stepIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.mstep{animation:none}}
+  #stepNav{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  @media (max-width:760px){ #stepNav{position:sticky;bottom:0;z-index:2;padding:10px 12px;border-radius:999px;background:#000a;backdrop-filter:blur(4px)} #drivers .card{width:84px;padding:6px} #drivers{gap:8px} }
+  .mstep[data-step="1"] .vcard{padding:16px 24px;gap:14px} .mstep[data-step="1"] .vi{font-size:46px} .mstep[data-step="1"] .vcard b{font-size:20px} .mstep[data-step="1"] .vcard small{font-size:13px}
+  @media (max-width:760px),(max-height:520px){ .step{font-size:12px;padding:5px 10px 5px 6px} .step em{display:none} }
   .cupcard{width:170px} .cupcard .rec{font-size:12px;line-height:1.5}
-  .vcard{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:14px;background:#ffffff22;border:3px solid transparent;cursor:pointer;text-align:left}
-  .vcard.sel{border-color:#ffeb3b;background:#ffffff38}
+  .vcard{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:14px;background:#0000006b;border:3px solid transparent;cursor:pointer;text-align:left}
+  .vcard.sel{border-color:#ffeb3b;background:#00000099}
   .vcard .vi{font-size:30px}
   .vcard b{display:block;font-size:16px}
   .vcard small{font-size:11px;opacity:.85}
-  .mode{font-size:19px;padding:10px 22px;border-radius:16px;background:#ffffff22;color:#fff;box-shadow:none;border:3px solid transparent}
-  .mode.sel{border-color:#ffeb3b;background:#ffffff38}
+  .mode{font-size:19px;padding:10px 22px;border-radius:16px;background:#0000006b;color:#fff;box-shadow:none;border:3px solid transparent}
+  .mode.sel{border-color:#ffeb3b;background:#00000099}
   .mode small{display:block;font-size:12px;font-weight:600;opacity:.85}
   .keys{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 18px;max-width:640px;
     font-size:13px;font-weight:600;color:#ffffffe0;background:#00000059;padding:9px 16px;border-radius:12px;text-shadow:none}
@@ -186,9 +200,20 @@
 
 <div id="menu" class="overlay">
   <h1>TURBO KARTS</h1>
-  <h2 class="shadow">Kies je coureur</h2>
-  <div id="drivers"></div>
-  <div id="vehicles"></div>
+  <nav id="steps" aria-label="Stappen">
+    <button class="step" data-step="0"><i>1</i><span>Coureur</span><em id="stepPick0"></em></button>
+    <button class="step" data-step="1"><i>2</i><span>Voertuig</span><em id="stepPick1"></em></button>
+    <button class="step" data-step="2"><i>3</i><span>Race</span><em id="stepPick2"></em></button>
+  </nav>
+  <section class="mstep" data-step="0">
+    <h2 class="shadow">Kies je coureur</h2>
+    <div id="drivers"></div>
+  </section>
+  <section class="mstep" data-step="1" hidden>
+    <h2 class="shadow">Kies je voertuig</h2>
+    <div id="vehicles"></div>
+  </section>
+  <section class="mstep" data-step="2" hidden>
   <h2 class="shadow">Wat wil je rijden?</h2>
   <div id="modes">
     <button class="mode sel" data-m="cup">🏆 Kampioenschap<small>2 cups van 3 banen, punten per plek</small></button>
@@ -230,7 +255,12 @@
     <span><kbd>W</kbd> gas</span><span><kbd>S</kbd> rem</span><span><kbd>A</kbd><kbd>D</kbd> sturen</span><span><kbd>Spatie</kbd> drift</span><span><kbd>E</kbd> item</span><span><kbd>Esc</kbd> menu</span>
     <small>Pijltjes werken ook · M geluid · R opnieuw</small>
   </div>
-  <button id="startBtn">START ▶</button>
+  </section>
+  <div id="stepNav">
+    <button id="backBtn" class="alt">◀ Terug</button>
+    <button id="nextStepBtn">Volgende ▶</button>
+    <button id="startBtn">START ▶</button>
+  </div>
 </div>
 
 <div id="results" class="overlay" hidden>
@@ -1413,7 +1443,8 @@ function buildMenu(){
     el.onclick = () => { menuTrack = i; loadTrack(i); setupRace(); buildMenu(); if (net.role === 'host') sendLobby(); };
     tb.appendChild(el);
   });
-  $('startBtn').hidden = on && net.role !== 'host';
+  $('startBtn').hidden = menuStep !== 2 || (on && net.role !== 'host');
+  updateSteps();
   $('startBtn').textContent = on ? 'START ONLINE (' + net.roster.length + ' ' + (net.roster.length === 1 ? 'speler' : 'spelers') + ') ▶' : mode === 'cup' ? 'START KAMPIOENSCHAP ▶' : 'START RACE ▶';
 }
 // ===== Uitnodigen: link met code, QR-code en delen =====
@@ -1464,11 +1495,27 @@ function autoJoinFromLink(){
   const code = (new URLSearchParams(location.search).get('join') || '').toUpperCase();
   if (!/^[A-Z0-9]{4}$/.test(code)) return;
   try { history.replaceState(null, '', location.pathname); } catch(e){}
-  mode = 'online'; $('codeIn').value = code; buildMenu();
+  mode = 'online'; $('codeIn').value = code; menuStep = 2; buildMenu();
   netStatus('Je bent uitgenodigd! Verbinden met ' + code + '…');
   const tryJoin = (n) => { if (typeof Peer !== 'undefined') joinGame(); else if (n > 0) setTimeout(() => tryJoin(n-1), 500); else netStatus('Online spelen kon niet laden. Heb je internet?'); };
   tryJoin(20);
 }
+// ===== Menu in stappen: 1 coureur, 2 voertuig, 3 race =====
+let menuStep = 0;
+function updateSteps(){
+  document.querySelectorAll('.mstep').forEach(sec => sec.hidden = +sec.dataset.step !== menuStep);
+  document.querySelectorAll('#steps .step').forEach(b => { const n = +b.dataset.step; b.classList.toggle('cur', n === menuStep); b.classList.toggle('done', n < menuStep); });
+  const d = DRIVERS[selected] || DRIVERS[0], V = VEHICLES[vehicle] || VEHICLES.kart;
+  $('stepPick0').textContent = d.face + ' ' + d.name;
+  $('stepPick1').textContent = V.icon + ' ' + V.name;
+  $('stepPick2').textContent = mode === 'online' ? '🌐' : mode === 'cup' ? '🏆' : '🏁';
+  $('backBtn').hidden = menuStep === 0;
+  $('nextStepBtn').hidden = menuStep === 2;
+}
+function goStep(n){ menuStep = clamp(n, 0, 2); buildMenu(); $('menu').scrollTop = 0; }
+$('backBtn').onclick = () => goStep(menuStep - 1);
+$('nextStepBtn').onclick = () => goStep(menuStep + 1);
+document.querySelectorAll('#steps .step').forEach(b => b.onclick = () => goStep(+b.dataset.step));
 function chooseVehicle(v){
   vehicle = v; try { localStorage.setItem('turbokarts_vehicle', v); } catch(e){}
   if (net.role === 'client') net.host.send({ t:'driver', d: selected, v });
@@ -1542,9 +1589,11 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
   if (state === 'menu'){
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') chooseDriver((selected+DRIVERS.length-1)%DRIVERS.length);
-    if (e.code === 'ArrowRight' || e.code === 'KeyD') chooseDriver((selected+1)%DRIVERS.length);
-    if (e.code === 'Enter') $('startBtn').click();
+    const left = e.code === 'ArrowLeft' || e.code === 'KeyA', right = e.code === 'ArrowRight' || e.code === 'KeyD';
+    if (menuStep === 0 && (left || right)) chooseDriver((selected + (right ? 1 : DRIVERS.length-1)) % DRIVERS.length);
+    if (menuStep === 1 && (left || right)) chooseVehicle(vehicle === 'kart' ? 'bike' : 'kart');
+    if (e.code === 'Enter') menuStep < 2 ? goStep(menuStep + 1) : $('startBtn').click();
+    if (e.code === 'Backspace' && menuStep > 0) goStep(menuStep - 1);
     return;
   }
   if (e.code === 'Enter' && state === 'done' && !$('results').hidden) (isCup() ? $('nextBtn') : $('againBtn')).click();
