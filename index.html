@@ -71,6 +71,10 @@
   @media (max-width:760px){ #stepNav{position:sticky;bottom:0;z-index:2;padding:10px 12px;border-radius:999px;background:#000a;backdrop-filter:blur(4px)} #drivers .card{width:84px;padding:6px} #drivers{gap:8px} }
   .mstep[data-step="1"] .vcard{padding:16px 24px;gap:14px} .mstep[data-step="1"] .vi{font-size:46px} .mstep[data-step="1"] .vcard b{font-size:20px} .mstep[data-step="1"] .vcard small{font-size:13px}
   @media (max-width:760px),(max-height:520px){ .step{font-size:12px;padding:5px 10px 5px 6px} .step em{display:none} }
+  #levels{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center;background:#0000006b;padding:5px 6px;border-radius:999px}
+  #levels > span{font-size:13px;font-weight:700;opacity:.8;padding:0 6px 0 8px}
+  .lv{font-size:14px;padding:6px 13px;background:transparent;color:#fff;box-shadow:none;border-radius:999px}
+  .lv.sel{background:#ffeb3b;color:#3a2a00} .lv:active{transform:none;box-shadow:none}
   .cupcard{width:170px} .cupcard .rec{font-size:12px;line-height:1.5}
   .vcard{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:14px;background:#0000006b;border:3px solid transparent;cursor:pointer;text-align:left}
   .vcard.sel{border-color:#ffeb3b;background:#00000099}
@@ -247,6 +251,7 @@
     <div id="onStatus" class="shadow"></div>
   </div>
   <div id="tracks" hidden></div>
+  <div id="levels" role="group" aria-label="Niveau van de bots"></div>
   <div class="keys only-touch">
     <span>◀ ▶ sturen</span><span>DRIFT in de bocht</span><span>🎁 item</span>
     <small>Telefoon liggend geeft het beste beeld</small>
@@ -1160,6 +1165,15 @@ const CUPS = [
   { name: 'Nacht Cup', emoji: '🌙', tracks: [2, 4, 3] },
 ];
 let cupSel = 0;
+// niveaus van de computerspelers (bots)
+const LEVELS = {
+  easy:    { name: 'Makkelijk', icon: '🐢', skill: 0.88, slow: -0.12, catchUp: 0.04, corner: 1.15, items: 1.8, rocket: 0.5 },
+  normal:  { name: 'Normaal',   icon: '🏎️', skill: 1.00, slow: -0.06, catchUp: 0.10, corner: 1.00, items: 1.0, rocket: 1.0 },
+  hard:    { name: 'Moeilijk',  icon: '🔥', skill: 1.05, slow: -0.03, catchUp: 0.12, corner: 0.85, items: 0.7, rocket: 1.4 },
+  extreme: { name: 'Extreem',   icon: '💀', skill: 1.10, slow: 0,     catchUp: 0.14, corner: 0.72, items: 0.5, rocket: 1.8 },
+};
+let level = 'normal'; try { const l = localStorage.getItem('turbokarts_level'); if (l in LEVELS) level = l; } catch(e){}
+const LV = () => LEVELS[level] || LEVELS.normal;
 const cupTracks = () => CUPS[cupSel].tracks;
 function setupRace(){
   clearRace(); firstFin = null;
@@ -1168,7 +1182,7 @@ function setupRace(){
   const skills = [0.97, 0.955, 0.94, 0.925, 0.91, 0.895, 0.88];
   const grid = [[N-2,-58],[N-2,58],[N-5,-58],[N-5,58],[N-8,-58],[N-8,58],[N-11,-58],[N-11,58]];
   cars = [];
-  ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i], grid[i][0], grid[i][1], AI_BIKES.has(di) ? 'bike' : 'kart')));
+  ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i]*LV().skill, grid[i][0], grid[i][1], AI_BIKES.has(di) ? 'bike' : 'kart')));
   humans.forEach((h, i) => { const g = grid[ais.length + i], c = makeCar(DRIVERS[h.d], false, 0.9, g[0], g[1], h.v || (net.role ? 'kart' : vehicle)); c.owner = h.id; c.itemSeen = 0; cars.push(c); });
   player = cars.find(c => c.owner === (net.role ? net.myId : 'local')) || cars[cars.length-1];
   camH = player.h; camPos.set(player.x - Math.cos(camH)*120, player.z + 48, player.y - Math.sin(camH)*120);
@@ -1178,7 +1192,7 @@ function raceUI(){
   for (const id of ['menu','results','podium']) $(id).hidden = true; document.body.classList.add('racing');
   $('hud').hidden = false; $('big').textContent = '';
   showMsg('Tip: geef gas als de 1 verschijnt voor een 🚀 raketstart'); msgT = 3;
-  $('trackname').textContent = (isCup() ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name + ' ' + (cupIdx+1) + '/' + cupTracks().length + ' · ' : '🏁 ') + TR.emoji + ' ' + TR.name + (net.role ? ' · 🌐 online' : '');
+  $('trackname').textContent = (isCup() ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name + ' ' + (cupIdx+1) + '/' + cupTracks().length + ' · ' : '🏁 ') + TR.emoji + ' ' + TR.name + ' · ' + LV().icon + ' ' + LV().name + (net.role ? ' · 🌐 online' : '');
 }
 function startRace(){
   if (net.role === 'client') return;
@@ -1199,7 +1213,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let slickId = 0;
 const netStatus = t => $('onStatus').textContent = t;
 function broadcast(m){ for (const c of net.conns) if (c.open) c.send(m); }
-function sendLobby(){ broadcast({ t:'lobby', roster: net.roster, code: net.code, sub: net.sub, track: menuTrack, cs: cupSel }); }
+function sendLobby(){ broadcast({ t:'lobby', roster: net.roster, code: net.code, sub: net.sub, track: menuTrack, cs: cupSel, lv: level }); }
 function setDriver(id, d){
   if (net.roster.some(r => r.d === d && r.id !== id)) return false;
   const r = net.roster.find(r => r.id === id); if (r) r.d = d;
@@ -1297,7 +1311,7 @@ function hostOnMsg(conn, m){
 function clientOnMsg(m){
   if (m.t === 'full'){ leaveOnline('Dit spel is vol of de race is al bezig'); return; }
   if (m.t === 'lobby'){
-    net.roster = m.roster; net.sub = m.sub; menuTrack = m.track; cupSel = m.cs || 0;
+    net.roster = m.roster; net.sub = m.sub; menuTrack = m.track; cupSel = m.cs || 0; if (m.lv in LEVELS) level = m.lv;
     const me = m.roster.find(r => r.id === net.myId); if (me){ selected = me.d; if (me.v) vehicle = me.v; }
     if (state === 'menu'){ loadTrack(isCup() ? cupTracks()[0] : menuTrack); setupRace(); buildMenu(); }
   }
@@ -1422,7 +1436,7 @@ function buildMenu(){
       return `<span class="pl" style="border:2px solid ${d.css}">${d.face} ${d.name} ${(VEHICLES[r.v] || VEHICLES.kart).icon}${r.id === 'host' ? ' 👑' : ''}${r.id === net.myId ? ' (jij)' : ''}</span>`; }).join('')
       + `<span class="pl" style="opacity:.7">+ ${RACE_SIZE - net.roster.length} computer</span>`;
     $('onHostOpts').hidden = net.role !== 'host'; $('onWait').hidden = net.role !== 'client';
-    if (net.role === 'client') $('onWait').textContent = 'Wachten tot de host start… (' + (net.sub === 'cup' ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name : '🏁 ' + TRACKS[menuTrack].name) + ')';
+    if (net.role === 'client') $('onWait').textContent = 'Wachten tot de host start… (' + (net.sub === 'cup' ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name : '🏁 ' + TRACKS[menuTrack].name) + ' · ' + LV().icon + ' ' + LV().name + ')';
     document.querySelectorAll('#subModes .mode').forEach(b => b.classList.toggle('sel', b.dataset.s === net.sub));
   }
   updateInvite();
@@ -1443,6 +1457,13 @@ function buildMenu(){
     el.onclick = () => { menuTrack = i; loadTrack(i); setupRace(); buildMenu(); if (net.role === 'host') sendLobby(); };
     tb.appendChild(el);
   });
+  // niveau van de bots (online kiest alleen de host)
+  const lvBox = $('levels'); lvBox.hidden = on && net.role !== 'host'; lvBox.innerHTML = '<span>Bots:</span>';
+  for (const [key, L] of Object.entries(LEVELS)){
+    const b = document.createElement('button'); b.className = 'lv' + (key === level ? ' sel' : ''); b.textContent = L.icon + ' ' + L.name;
+    b.onclick = () => { level = key; try { localStorage.setItem('turbokarts_level', key); } catch(e){} buildMenu(); if (net.role === 'host') sendLobby(); };
+    lvBox.appendChild(b);
+  }
   $('startBtn').hidden = menuStep !== 2 || (on && net.role !== 'host');
   updateSteps();
   $('startBtn').textContent = on ? 'START ONLINE (' + net.roster.length + ' ' + (net.roster.length === 1 ? 'speler' : 'spelers') + ') ▶' : mode === 'cup' ? 'START KAMPIOENSCHAP ▶' : 'START RACE ▶';
@@ -1663,7 +1684,7 @@ function aiInput(c, t){
   const a = wrap(Math.atan2(ty-c.y, tx-c.x) - c.h);
   const d2 = dir(i+15), curve = Math.abs(wrap(Math.atan2(d2.y,d2.x) - Math.atan2(d.y,d.x)));
   const ice = P(c.idx+6).ice ? 0.82 : 1;
-  const target = 640*c.top*c.skill*c.rubber*(1 - Math.min(0.5, curve*0.9))*ice;
+  const target = 640*c.top*c.skill*c.rubber*(1 - Math.min(0.5, curve*0.9*LV().corner))*ice;
   return { steer: clamp(a*2.2,-1,1), up: c.vf < target, down: c.vf > target+60, drift:false };
 }
 
@@ -1921,7 +1942,7 @@ function notify(c, text){
 function rocketStarts(){
   for (const c of cars){
     let g = c.gasAt;
-    if (c.ai){ const r = Math.random(); g = r < c.skill*0.45 ? 1 : r < 0.8 ? 2 : null; }
+    if (c.ai){ const r = Math.random(); g = r < c.skill*0.45*LV().rocket ? 1 : r < 0.8 ? 2 : null; }
     c.gasAt = null;
     if (g == null) continue;
     if (g <= 1.5){ boost(c, 1.3); notify(c, '🚀 RAKETSTART!'); }
@@ -1990,7 +2011,7 @@ function update(dt){
     RANK = ranking();
     let lead = -1e9; for (const h of cars) if (!h.ai) lead = Math.max(lead, h.total);
     for (const c of cars){
-      if (c.ai) c.rubber = 1 + clamp((lead - c.total)/N*0.25, -0.06, 0.1);
+      if (c.ai) c.rubber = 1 + clamp((lead - c.total)/N*0.25, LV().slow, LV().catchUp);
       const inp = (c.ai || c.finished) ? aiInput(c, simT) : c === player ? playerInput() : netInput(c);
       if (!c.ai && !c.finished) driftLogic(c, inp, dt);
       physics(c, inp, dt); trackProgress(c); vertical(c, dt); effects(c, dt);
@@ -1998,8 +2019,8 @@ function update(dt){
         b.g.visible = false; b.off = 2.5;
         if (!c.item && c.rollT <= 0){ c.rollT = c.ai ? 0.6 : 1.2; if (c === player) sfx.item(); }
       }
-      if (c.rollT > 0){ c.rollT -= dt; if (c.rollT <= 0){ c.rollT = 0; c.item = pickItem(c); c.itemCount = c.item === 'turbo3' ? 3 : 1; c.aiUseT = 1 + Math.random()*3; } }
-      if (c.ai && c.item){ c.aiUseT -= dt; if (c.aiUseT <= 0){ useItem(c); c.aiUseT = 0.6 + Math.random()*1.5; } }
+      if (c.rollT > 0){ c.rollT -= dt; if (c.rollT <= 0){ c.rollT = 0; c.item = pickItem(c); c.itemCount = c.item === 'turbo3' ? 3 : 1; c.aiUseT = (1 + Math.random()*3)*LV().items; } }
+      if (c.ai && c.item){ c.aiUseT -= dt; if (c.aiUseT <= 0){ useItem(c); c.aiUseT = (0.6 + Math.random()*1.5)*LV().items; } }
       for (const p of pads) if (!c.air && (p.x-c.x)**2 + (p.z-c.y)**2 < 45*45 && Math.abs(c.z - p.h) < 25 && c.boostT < 0.8) boost(c, 1.0);
     }
     if (itemPressed && state === 'race') useItem(player);
