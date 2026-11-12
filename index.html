@@ -1176,11 +1176,31 @@ function setDriver(id, d){
   if (id === net.myId) selected = d;
   return true;
 }
-function hostGame(){
+// ===== Verbindingsservers =====
+// STUN helpt telefoons hun adres te vinden. Een TURN-server stuurt het verkeer door als een directe
+// verbinding niet lukt (bijvoorbeeld 4G/5G tegen wifi). Vul hieronder een Metered-app en API-sleutel in
+// om TURN aan te zetten (gratis account op metered.ca).
+const TURN_CONFIG = { meteredApp: '', apiKey: '' };
+let iceCache = null;
+async function iceServers(){
+  if (iceCache) return iceCache;
+  const list = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
+  if (TURN_CONFIG.meteredApp && TURN_CONFIG.apiKey){
+    try {
+      const r = await fetch('https://' + TURN_CONFIG.meteredApp + '.metered.live/api/v1/turn/credentials?apiKey=' + encodeURIComponent(TURN_CONFIG.apiKey));
+      if (r.ok) list.push(...await r.json());
+    } catch(e){}
+  }
+  return iceCache = list;
+}
+const hasTurn = () => !!(TURN_CONFIG.meteredApp && TURN_CONFIG.apiKey);
+const NET_BLOCKED = 'Het spel is gevonden, maar het netwerk blokkeert de verbinding. Zet op allebei de telefoons wifi aan en gebruik hetzelfde wifi-netwerk (niet 4G/5G).';
+
+async function hostGame(){
   if (typeof Peer === 'undefined') return netStatus('Online spelen kon niet laden. Heb je internet?');
   netStatus('Spel maken…');
   const code = Array.from({ length: 4 }, () => CODE_CHARS[Math.random()*CODE_CHARS.length | 0]).join('');
-  const peer = new Peer('turbokarts-' + code);
+  const peer = new Peer('turbokarts-' + code, { config: { iceServers: await iceServers() } });
   peer.on('open', () => {
     Object.assign(net, { role:'host', peer, code, myId:'host', conns:[], inputs:{}, roster:[{ id:'host', d: selected, v: vehicle }] });
     netStatus(''); setupRace(); buildMenu();
@@ -1198,20 +1218,31 @@ function hostGame(){
     conn.on('close', () => dropPeer(conn.peer));
   });
 }
-function joinGame(){
+async function joinGame(){
   if (typeof Peer === 'undefined') return netStatus('Online spelen kon niet laden. Heb je internet?');
   const code = $('codeIn').value.trim().toUpperCase();
   if (code.length !== 4) return netStatus('Typ de code van 4 tekens die de host ziet');
   netStatus('Verbinden met ' + code + '…');
-  const peer = new Peer();
+  const peer = new Peer({ config: { iceServers: await iceServers() } });
+  let notFound = false, done = false;
+  const fail = msg => { if (done) return; done = true; netStatus(msg); try { peer.destroy(); } catch(e){} };
   peer.on('open', id => {
     const conn = peer.connect('turbokarts-' + code, { reliable: true, serialization: 'json' });
-    const to = setTimeout(() => { if (!conn.open){ netStatus('Geen spel gevonden met code ' + code); peer.destroy(); } }, 9000);
-    conn.on('open', () => { clearTimeout(to); Object.assign(net, { role:'client', peer, host: conn, code, myId: id }); netStatus(''); conn.send({ t:'driver', d: selected, v: vehicle }); buildMenu(); });
+    const to = setTimeout(() => { if (!conn.open) fail(notFound ? 'Geen spel gevonden met code ' + code : NET_BLOCKED); }, hasTurn() ? 20000 : 15000);
+    // de directe verbinding is mislukt: vertel dat het aan het netwerk ligt
+    const watchIce = () => { const pc = conn.peerConnection; if (!pc) return setTimeout(watchIce, 200);
+      pc.addEventListener('iceconnectionstatechange', () => { if (pc.iceConnectionState === 'failed' && !conn.open){ clearTimeout(to); fail(NET_BLOCKED); } }); };
+    watchIce();
+    conn.on('open', () => { if (done) return; done = true; clearTimeout(to); Object.assign(net, { role:'client', peer, host: conn, code, myId: id }); netStatus(''); conn.send({ t:'driver', d: selected, v: vehicle }); buildMenu(); });
     conn.on('data', clientOnMsg);
-    conn.on('close', () => { if (net.role === 'client') leaveOnline('De host heeft het spel verlaten'); });
+    conn.on('close', () => { if (net.role === 'client') leaveOnline('De verbinding met de host is verbroken. Bleef het scherm van iemand even uit? Doe opnieuw mee met de code.'); });
   });
-  peer.on('error', e => { if (net.role !== 'client') netStatus(e.type === 'peer-unavailable' ? 'Geen spel gevonden met code ' + code : 'Er ging iets mis: ' + e.type); });
+  peer.on('error', e => {
+    if (net.role === 'client') return;
+    if (e.type === 'peer-unavailable'){ notFound = true; fail('Geen spel gevonden met code ' + code + '. Klopt de code, en staat het spel van de host nog open?'); }
+    else if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error') fail('Geen verbinding met de spelserver. Heb je internet?');
+    else fail('Er ging iets mis (' + e.type + '). Probeer het opnieuw.');
+  });
 }
 function leaveOnline(reason){
   const wasPlaying = state !== 'menu';
