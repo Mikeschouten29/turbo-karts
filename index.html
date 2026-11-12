@@ -2,7 +2,9 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Turbo Karts</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#9fcff5;font-family:system-ui,"Segoe UI",sans-serif;color:#fff;user-select:none}
@@ -75,6 +77,39 @@
   .card.taken{opacity:.35;cursor:not-allowed}
   .card .tk{font-size:11px;font-weight:800;color:#ffcc80}
   #resWait{font-weight:700;opacity:.9}
+  .overlay{justify-content:safe center}
+  /* ===== aanraakbediening (telefoon/tablet) ===== */
+  .only-touch{display:none}
+  body.touch .only-touch{display:block}
+  body.touch .only-keys{display:none}
+  #tbar,#tLeft,#tRight{display:none}
+  body.touch #itemhint{display:none}
+  body.touch #tbar{display:flex;gap:6px;position:absolute;left:50%;transform:translateX(-50%);top:104px;pointer-events:auto}
+  .tb{font-size:12px;font-weight:800;padding:6px 11px;background:#0009;color:#fff;box-shadow:none;border-radius:14px;white-space:nowrap}
+  body.touch #tLeft{display:flex;gap:14px;position:absolute;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));pointer-events:auto}
+  body.touch.tilt #tLeft{display:none}
+  body.touch #tRight{display:grid;grid-template-columns:auto auto;gap:10px;align-items:end;justify-items:center;position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));pointer-events:auto}
+  .tbtn{width:86px;height:86px;border-radius:50%;padding:0;font-size:32px;font-weight:900;font-style:normal;background:#ffffff2e;color:#fff;
+    border:3px solid #ffffffb0;box-shadow:0 4px 0 #0005;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  .tbtn.sm{width:64px;height:64px;font-size:15px}
+  .tbtn.drift{font-size:12px;background:#40c4ff55}
+  .tbtn.gas{width:102px;height:102px;font-size:21px;background:#69f0ae66}
+  .tbtn.on{background:#ffffffa0;color:#222;transform:scale(.93)}
+  body.touch #speed{right:auto;left:50%;transform:translateX(-50%);bottom:max(12px,env(safe-area-inset-bottom));font-size:34px;text-align:center}
+  body.touch #gear{display:none}
+  canvas{touch-action:none}
+  @media (max-width:760px),(max-height:520px){
+    #pos{font-size:44px;left:14px;top:6px} #pos small{font-size:18px}
+    #lap{top:58px;left:16px;font-size:16px} #time{top:80px;left:16px;font-size:14px}
+    #best{top:100px;left:16px;font-size:11px} #trackname{display:none}
+    #itembox{width:62px;height:62px;font-size:36px;top:10px;border-width:3px}
+    body.touch #tbar{top:80px}
+    #big{font-size:76px} #msg{font-size:22px;top:24%}
+    #mm{right:10px;top:10px}
+    .tbtn{width:72px;height:72px;font-size:26px} .tbtn.sm{width:56px;height:56px;font-size:13px} .tbtn.gas{width:88px;height:88px;font-size:18px}
+    h1{font-size:clamp(34px,8vw,60px)} .card{width:92px;padding:8px} .face{width:44px;height:44px;font-size:24px} .tcard{width:120px}
+    .keys{font-size:12px} button{font-size:18px;padding:10px 24px}
+  }
   [hidden]{display:none!important}
 </style>
 </head>
@@ -89,6 +124,21 @@
   <div id="itemhint">E / X = item gebruiken</div>
   <canvas id="mm"></canvas>
   <div id="speed"><span id="spd">0</span> <small>km/u</small><span id="gear">versnelling 1</span></div>
+  <div id="tbar">
+    <button id="tMenu" class="tb">☰ Menu</button>
+    <button id="tTilt" class="tb">📱 Kantelen: uit</button>
+    <button id="tAuto" class="tb">⚡ Auto-gas: aan</button>
+  </div>
+  <div id="tLeft">
+    <button class="tbtn" data-k="ArrowLeft" aria-label="Links sturen">◀</button>
+    <button class="tbtn" data-k="ArrowRight" aria-label="Rechts sturen">▶</button>
+  </div>
+  <div id="tRight">
+    <button class="tbtn sm" data-k="item" aria-label="Item gebruiken">🎁</button>
+    <button class="tbtn sm drift" data-k="Space" aria-label="Driften">DRIFT</button>
+    <button class="tbtn sm" data-k="ArrowDown" aria-label="Remmen">REM</button>
+    <button class="tbtn gas" data-k="ArrowUp" aria-label="Gas">GAS</button>
+  </div>
 </div>
 <div id="big" class="shadow"></div>
 <div id="msg" class="shadow"></div>
@@ -122,7 +172,11 @@
     <div id="onStatus" class="shadow"></div>
   </div>
   <div id="tracks" hidden></div>
-  <div class="keys shadow">
+  <div class="keys shadow only-touch">
+    📱 Stuur met ◀ ▶ of zet <b>kantelen</b> aan · houd <b>DRIFT</b> vast in een bocht voor een turbo · 🎁 = item gebruiken<br>
+    Draai je telefoon liggend voor het beste beeld
+  </div>
+  <div class="keys shadow only-keys">
     <kbd>↑</kbd>/<kbd>W</kbd> gas &nbsp; <kbd>↓</kbd>/<kbd>S</kbd> rem &nbsp; <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> sturen &nbsp; <kbd>Spatie</kbd> driften (loslaten = turbo)<br>
     ✨ kristallen = item, gebruik met <kbd>E</kbd>/<kbd>X</kbd> &nbsp;·&nbsp; <kbd>M</kbd> geluid &nbsp;·&nbsp; <kbd>R</kbd> opnieuw &nbsp;·&nbsp; <kbd>Esc</kbd> menu
   </div>
@@ -214,8 +268,10 @@ const THEMES = {
 };
 
 // ================= Renderer, licht, lucht =================
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+if (IS_TOUCH) document.body.classList.add('touch');
+const renderer = new THREE.WebGLRenderer({ antialias: !IS_TOUCH });
+renderer.setPixelRatio(Math.min(IS_TOUCH ? 1.5 : 2, devicePixelRatio || 1));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.prepend(renderer.domElement);
 const ANISO = renderer.capabilities.getMaxAnisotropy();
@@ -226,7 +282,7 @@ function resize(){ renderer.setSize(innerWidth, innerHeight); camera.aspect = in
 addEventListener('resize', resize); resize();
 const hemi = new THREE.HemisphereLight(0xffffff, 0x556644, 0.7); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+sun.castShadow = true; sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
 Object.assign(sun.shadow.camera, { left:-650, right:650, top:650, bottom:-650, near:10, far:3200 });
 sun.shadow.bias = -0.0006;
 scene.add(sun, sun.target);
@@ -1060,11 +1116,57 @@ addEventListener('keydown', e => {
   if ((e.code === 'KeyE' || e.code === 'KeyX') && !e.repeat) itemPressed = true;
 });
 addEventListener('keyup', e => keys[e.code] = false);
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; document.querySelectorAll('.tbtn.on').forEach(b => b.classList.remove('on')); });
+
+// ===== Aanraakbediening =====
+let autoGas = true, tiltOn = false, tiltSteer = 0;
+const usingTouch = () => document.body.classList.contains('touch');
+// toetsenbord gebruikt -> knoppen verbergen; scherm aangeraakt -> knoppen tonen
+addEventListener('keydown', e => { if (/^(Arrow|Key[WASD]|Space)/.test(e.code) && e.isTrusted && e.target.id !== 'codeIn') document.body.classList.remove('touch'); }, true);
+addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') document.body.classList.add('touch');
+  initAudio(); if (AC && AC.state === 'suspended') AC.resume();
+  // op telefoon: volledig scherm bij de eerste knop in het menu
+  if (e.pointerType === 'touch' && e.target.closest && e.target.closest('#menu button') && !document.fullscreenElement && document.documentElement.requestFullscreen){
+    document.documentElement.requestFullscreen().then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
+  }
+}, true);
+document.querySelectorAll('.tbtn').forEach(b => {
+  const k = b.dataset.k;
+  const down = e => { e.preventDefault(); b.classList.add('on'); if (k === 'item') itemPressed = true; else keys[k] = true; try { b.setPointerCapture(e.pointerId); } catch(_){} };
+  const up = () => { b.classList.remove('on'); if (k !== 'item') keys[k] = false; };
+  b.addEventListener('pointerdown', down);
+  ['pointerup','pointercancel','lostpointercapture'].forEach(ev => b.addEventListener(ev, up));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+});
+function onTilt(e){
+  const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  let v = ang === 90 ? e.beta : (ang === -90 || ang === 270) ? -e.beta : e.gamma;
+  if (v == null) return;
+  v = Math.abs(v) < 3 ? 0 : v - Math.sign(v)*3;          // kleine dode zone
+  tiltSteer = clamp(v/22, -1, 1);
+}
+async function toggleTilt(){
+  if (!tiltOn){
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission){
+        if (await DeviceOrientationEvent.requestPermission() !== 'granted'){ showMsg('Kantelen is niet toegestaan'); return; }
+      }
+    } catch(e){ showMsg('Kantelen werkt hier niet'); return; }
+    addEventListener('deviceorientation', onTilt); tiltOn = true;
+  } else { removeEventListener('deviceorientation', onTilt); tiltOn = false; tiltSteer = 0; }
+  document.body.classList.toggle('tilt', tiltOn);
+  $('tTilt').textContent = '📱 Kantelen: ' + (tiltOn ? 'aan' : 'uit');
+}
+$('tTilt').onclick = toggleTilt;
+$('tAuto').onclick = () => { autoGas = !autoGas; $('tAuto').textContent = '⚡ Auto-gas: ' + (autoGas ? 'aan' : 'uit'); };
+$('tMenu').onclick = () => net.role === 'client' ? leaveOnline() : toMenu();
 
 function playerInput(){
-  return { up: keys.ArrowUp || keys.KeyW, down: keys.ArrowDown || keys.KeyS, drift: keys.Space || keys.ShiftLeft || keys.ShiftRight,
-    steer: ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0) };
+  const braking = keys.ArrowDown || keys.KeyS;
+  const steerKeys = ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0);
+  return { up: keys.ArrowUp || keys.KeyW || (autoGas && usingTouch() && !braking), down: braking, drift: keys.Space || keys.ShiftLeft || keys.ShiftRight,
+    steer: steerKeys || (tiltOn ? tiltSteer : 0) };
 }
 function aiInput(c, t){
   const look = 10 + Math.floor(Math.abs(c.vf)/45), i = c.idx + look, p = P(i), d = dir(i);
@@ -1428,7 +1530,7 @@ function syncKart(c, dt){
 
 const mm = $('mm'), mctx = mm.getContext('2d');
 function drawMinimap(){
-  const w = Math.min(200, innerWidth*0.28), s = w/(maxX-minX+300), h = (maxY-minY+300)*s;
+  const w = Math.min(200, innerWidth*0.28, innerHeight*0.4), s = w/(maxX-minX+300), h = (maxY-minY+300)*s;
   if (mm.width !== Math.round(w) || mm.height !== Math.round(h)){ mm.width = Math.round(w); mm.height = Math.round(h); }
   mctx.clearRect(0, 0, mm.width, mm.height);
   mctx.save(); mctx.translate((150-minX)*s, (150-minY)*s); mctx.scale(s, s);
