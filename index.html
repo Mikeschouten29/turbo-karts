@@ -68,6 +68,8 @@
   @keyframes stepIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){.mstep{animation:none}}
   #stepNav{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  #menu.showcase{background:linear-gradient(180deg,#0000 0%,#0000 28%,#000000b0 58%,#000000d9 100%);justify-content:flex-end}
+  #menu.showcase h1{margin-bottom:auto}
   @media (max-width:760px){ #stepNav{position:sticky;bottom:0;z-index:2;padding:10px 12px;border-radius:999px;background:#000a;backdrop-filter:blur(4px)} #drivers .card{width:84px;padding:6px} #drivers{gap:8px} }
   .mstep[data-step="1"] .vcard{padding:16px 24px;gap:14px} .mstep[data-step="1"] .vi{font-size:46px} .mstep[data-step="1"] .vcard b{font-size:20px} .mstep[data-step="1"] .vcard small{font-size:13px}
   @media (max-width:760px),(max-height:520px){ .step{font-size:12px;padding:5px 10px 5px 6px} .step em{display:none} }
@@ -80,7 +82,8 @@
   .vcard.sel{border-color:#ffeb3b;background:#00000099}
   .vcard .vi{font-size:30px}
   .vcard b{display:block;font-size:16px}
-  .vcard small{font-size:11px;opacity:.85}
+  .vcard small{font-size:11px;opacity:.85;display:block;margin-bottom:4px}
+  .vcard .stat{width:150px}
   .mode{font-size:19px;padding:10px 22px;border-radius:16px;background:#0000006b;color:#fff;box-shadow:none;border:3px solid transparent}
   .mode.sel{border-color:#ffeb3b;background:#00000099}
   .mode small{display:block;font-size:12px;font-weight:600;opacity:.85}
@@ -356,6 +359,12 @@ const TRACKS = [
   { id:'woestijn', name:'Woestijncanyon', emoji:'🏜️', theme:'desert',
     ctrl:[[600,1700,0],[1600,1750,0],[2400,1600,15],[2800,1100,40],[2600,600,60],[2000,450,60],[1700,800,40],[1300,500,30],[800,400,15],[350,700,0],[300,1250,0]],
     boxes:[0.7,4.5,9.5], pads:[1.2,6.4], jumps:[{at:1.5, gap:true},{at:5.5}], tunnels:[[7.25,8.35]], ice:[], arches:[3.5, 9.6] },
+  { id:'gp', name:'Racecircuit', emoji:'🏁', theme:'gp',
+    ctrl:[[400,1700,0],[1700,1720,0],[2500,1680,0],[2850,1450,0],[2700,1150,10],[2250,1100,15],[2000,850,20],[2300,550,25],[2800,450,20],[2850,250,15],[2200,200,10],[1300,250,5],[800,350,0],[450,700,0],[600,1050,0],[350,1350,0]],
+    boxes:[1.3,7.5,12.4], pads:[0.5,10.5], jumps:[], tunnels:[], ice:[] },
+  { id:'jungle', name:'Jungletempel', emoji:'🌴', theme:'jungle',
+    ctrl:[[500,1700,0],[1500,1750,0],[2300,1650,10],[2700,1250,30],[2500,800,55],[2900,450,70],[2300,250,70],[1700,450,50],[1300,850,30],[900,600,20],[450,450,10],[250,950,0],[300,1400,0]],
+    boxes:[0.8,4.5,9.6], pads:[1.25,7.4], jumps:[{at:1.55, gap:true},{at:8.5}], tunnels:[[5.4,6.4]], ice:[], arches:[3.4, 10.5] },
 ];
 const THEMES = {
   beach:{ sky:['#2a8be0','#8cc8f2','#e9f4fb'], fog:[0xe9f4fb,3000,12000], hemi:[0xe8f4ff,0xc8b88a,0.7], sun:[0xfff3dd,1.0],
@@ -376,6 +385,12 @@ const THEMES = {
   desert:{ sky:['#3b8fd9','#a9d3f2','#f4dcb0'], fog:[0xf4dcb0,2500,11000], hemi:[0xfff1d6,0xc8925a,0.75], sun:[0xfff0c8,1.05],
     ground:['#d9a066','#c98e55','#e3b27a','#b97d47'], runoff:0xc8955a, wallA:0xd84315, wallB:0xffffff, curbA:0xd84315, curbB:0xffffff,
     mount:0xb5652b, snowcap:false, trees:'cactus', weather:null, grip:1 },
+  gp:{ sky:['#3a86d6','#9cccf0','#e6f2f8'], fog:[0xe6f2f8,3000,12500], hemi:[0xeaf4ff,0x5a7a45,0.72], sun:[0xfff3dd,1.0],
+    ground:['#4f9a43','#46903c','#5aa84d','#3f8536'], runoff:0xcbbd98, wallA:0xd32f2f, wallB:0xffffff, curbA:0xd32f2f, curbB:0xffffff,
+    mount:0x6f8d6c, snowcap:false, trees:'park', weather:null, grip:1 },
+  jungle:{ sky:['#4f9fd6','#a6d4ec','#d4ead8'], fog:[0xc9e2cf,1400,7500], hemi:[0xeaffea,0x3d5a2a,0.78], sun:[0xfff2d0,0.85],
+    ground:['#3f7a35','#356b2d','#4a8a3f','#2f5f28'], runoff:0x6b5a3a, wallA:0x6d4c41, wallB:0xa1887f, curbA:0x2e7d32, curbB:0xffeb3b,
+    mount:0x3f6b3a, snowcap:false, trees:'jungle', weather:'rain', grip:0.95 },
 };
 
 // ================= Renderer, licht, lucht =================
@@ -563,13 +578,13 @@ function buildTrack(k){
       const a = hash(xi, yi), b = hash(xi+1, yi), c = hash(xi, yi+1), d = hash(xi+1, yi+1); return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v; };
     const fbm = (x, y) => { let s = 0, a = 0.5, f = 1; for (let o = 0; o < 5; o++){ s += a*vnoise(x*f, y*f); f *= 2.03; a *= 0.5; } return s; };
     const smooth = (a, b, x) => { const t = clamp((x-a)/(b-a), 0, 1); return t*t*(3-2*t); };
-    const MT = { beach: 1000, snow: 2300, night: 900, lava: 1500, desert: 420, city: 0 }[TR.theme] ?? 1000;
+    const MT = { beach: 1000, snow: 2300, night: 900, lava: 1500, desert: 420, city: 0, gp: 650, jungle: 1600 }[TR.theme] ?? 1000;
     const TS = 30000, SEG = IS_TOUCH ? 110 : 160;
     const tg = new THREE.PlaneGeometry(TS, TS, SEG, SEG); tg.rotateX(-Math.PI/2);
     const pos = tg.attributes.position, col = new Float32Array(pos.count*3);
     const sample = PTS.filter((_, i) => i % 4 === 0);
     const cBase = new THREE.Color(TH.ground[0]), cDark = new THREE.Color(TH.ground[3]);
-    const cRock = new THREE.Color(({ desert: 0xa65a2a, lava: 0x2a201d, night: 0x2b3040, snow: 0x8a8f96, beach: 0x6f7a62 })[TR.theme] || 0x777a72);
+    const cRock = new THREE.Color(({ desert: 0xa65a2a, lava: 0x2a201d, night: 0x2b3040, snow: 0x8a8f96, beach: 0x6f7a62, gp: 0x6f7a62, jungle: 0x46573c })[TR.theme] || 0x777a72);
     const cSnow = new THREE.Color(0xf4f7fb), c = new THREE.Color();
     const snowy = TR.theme === 'snow' || TR.theme === 'beach';
     for (let v = 0; v < pos.count; v++){
@@ -636,7 +651,7 @@ function buildTrack(k){
   }
   // tunnels
   const tunMat = new THREE.MeshStandardMaterial({ color: 0x5d5550, roughness: 0.95, side: THREE.DoubleSide });
-  const rockMat = new THREE.MeshStandardMaterial({ color: ({ snow: 0x8a8f96, city: 0x55585f, desert: 0xa0522d })[TR.theme] || 0x3b2f2a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
+  const rockMat = new THREE.MeshStandardMaterial({ color: ({ snow: 0x8a8f96, city: 0x55585f, desert: 0xa0522d, jungle: 0x5b6a4a })[TR.theme] || 0x3b2f2a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
   const notTun = i => !P(i).tunnel;
   const tunRoof = strip(-(WALL+10), TUN_H, WALL+10, TUN_H, tunMat, null, notTun); if (tunRoof) tunRoof.castShadow = true;
   for (const s of [1, -1]){
@@ -868,6 +883,17 @@ function buildTrack(k){
       for (let q = 0; q < 3; q++){ const l = new THREE.Mesh(cone, type === 'snowpine' && q === 2 ? kit.snow : lm), sc = sz*(1.25 - q*0.3);
         l.scale.set(sc, sc, sc); l.position.y = 24 + sz*0.55 + q*sz*0.62; t.add(l);
         if (type === 'snowpine' && q < 2){ const cap = new THREE.Mesh(cone, kit.snow); cap.scale.set(sc*0.55, sc*0.35, sc*0.55); cap.position.y = l.position.y + sc*0.55; t.add(cap); } }
+    } else if (type === 'park'){
+      if (R() < 0.45) return makeTree('pine');
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(3, 5, 34, 10), kit.trunk); tr.position.y = 17; t.add(tr);
+      const lm = kit.leaf[Math.floor(R()*kit.leaf.length)];
+      for (const [x, y, z, r] of [[0, 46, 0, 19], [9, 38, 4, 13], [-8, 40, -5, 14], [2, 56, -3, 12]]){ const b = new THREE.Mesh(sph(r, 12), lm); b.position.set(x, y, z); t.add(b); }
+    } else if (type === 'jungle'){
+      if (R() < 0.3) return makeTree('palm');
+      const h = 80 + R()*50, tr = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 6, h, 10), kit.trunk); tr.position.y = h/2; t.add(tr);
+      const lm = kit.leaf[Math.floor(R()*kit.leaf.length)];
+      for (const [x, y, z, r] of [[0, h + 6, 0, 24], [16, h - 4, 6, 16], [-14, h - 2, -8, 17], [4, h + 14, -10, 14]]){ const b = new THREE.Mesh(sph(r, 12), lm); b.scale.y = 0.65; b.position.set(x, y, z); t.add(b); }
+      for (let q = 0; q < 3; q++){ const vine = new THREE.Mesh(G('vine', () => new THREE.CylinderGeometry(0.6, 0.6, 30, 5)), kit.leaf[0]); vine.position.set((R()-.5)*30, h - 18, (R()-.5)*30); t.add(vine); }
     } else if (type === 'cactus'){
       const cm = kit.cactus, tr = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 60, 14), cm); tr.position.y = 30; t.add(tr);
       const top = new THREE.Mesh(new THREE.SphereGeometry(6, 8, 6), cm); top.position.y = 60; t.add(top);
@@ -885,7 +911,8 @@ function buildTrack(k){
     t.scale.setScalar(s); t.rotation.y = R()*6; return t;
   }
   let tries = 0; const forest = new THREE.Group(); addW(forest);
-  for (let n = 0; n < 160 && tries < 7000 && TH.trees !== 'none'; tries++){
+  const treeCount = TR.theme === 'jungle' ? 260 : 160;
+  for (let n = 0; n < treeCount && tries < 9000 && TH.trees !== 'none'; tries++){
     const x = B.x0 - 500 + R()*(B.x1-B.x0+1000), y = B.y0 - 500 + R()*(B.y1-B.y0+1000);
     if (!roadClear(x, y, 20) || Math.hypot(x-STAND.x, y-STAND.z) < 420) continue;
     if (TR.theme === 'beach' && y > maxY + 260) continue;
@@ -1074,9 +1101,59 @@ function buildTrack(k){
       worldAnims.push((t, dt) => { tw.position.x = x0 + Math.sin(t*0.15 + ph)*260; tw.position.y = 11 + Math.abs(Math.sin(t*3 + ph))*8; tw.rotation.z -= sp*dt/11; });
     }
   }
+  if (TR.theme === 'jungle'){
+    const moss = new THREE.MeshStandardMaterial({ color: 0x6f7a5a, roughness: 1 }), mossDark = new THREE.MeshStandardMaterial({ color: 0x4e5a3e, roughness: 1 });
+    // stenen bogen met ranken over de weg
+    for (const f of TR.arches || []){
+      const i = idxOf(f), g = onTrack(i, 0, 0);
+      for (const sd of [-1, 1]){ const pil = new THREE.Mesh(rbox(40, 150, 40, 6), moss); pil.position.set(0, 75, sd*(WALL+40)); g.add(pil); }
+      const top = new THREE.Mesh(rbox(48, 34, 2*WALL+130, 8), mossDark); top.position.y = 165; g.add(top);
+      for (let q = 0; q < 8; q++){ const vine = new THREE.Mesh(G('vine2', () => new THREE.CylinderGeometry(0.9, 0.9, 40, 5)), kit.leaf[1]); vine.position.set((R()-.5)*30, 128, (R()-.5)*(2*WALL)); g.add(vine); }
+      shadows(g);
+    }
+    // rivier onder de sprong
+    const water = new THREE.MeshStandardMaterial({ color: 0x2f7d8c, metalness: 0.3, roughness: 0.15, transparent: true, opacity: 0.92 });
+    for (let i = 0; i < N; i++) if (P(i).gap && !P(i-1).gap){ const g = onTrack(i+1, 0, 0); g.position.y = 0.7; g.add(flat(new THREE.Mesh(new THREE.PlaneGeometry(160, 2*WALL+900), water))); }
+    // tempelpiramide op de grootste vrije plek
+    let best = null, bd = 0;
+    for (let q = 0; q < 400; q++){ const x = minX + R()*(maxX-minX), y = minY + R()*(maxY-minY); let d = 1e9;
+      for (const p of PTS) d = Math.min(d, Math.hypot(p.x-x, p.y-y)); if (d > bd && noTree.every(o => Math.hypot(o.x-x, o.z-y) > 300)){ bd = d; best = [x, y]; } }
+    if (best && bd > WALL + 140){
+      const sc = clamp((bd - WALL - 40)/200, 0.5, 1.3), tg = new THREE.Group();
+      for (let l = 0; l < 6; l++){ const w = 300 - l*44; const b = new THREE.Mesh(rbox(w, 34, w, 4), l % 2 ? moss : mossDark); b.position.y = 17 + l*34; tg.add(b); }
+      const shrine = new THREE.Mesh(rbox(70, 50, 70, 5), mossDark); shrine.position.y = 6*34 + 25; tg.add(shrine);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(2, 30, 24), new THREE.MeshBasicMaterial({ color: 0x111111 })); door.position.set(36, 6*34 + 18, 0); tg.add(door);
+      const stairs = new THREE.Mesh(new THREE.BoxGeometry(60, 6*34, 50), moss); stairs.position.set(150, 3*34 - 20, 0); stairs.rotation.z = 0.78; tg.add(stairs);
+      tg.scale.setScalar(sc); tg.position.set(best[0], 0, best[1]); tg.rotation.y = R()*6; shadows(tg); addW(tg); noTree.push({ x: best[0], z: best[1] });
+    }
+    // omgevallen zuilen en stenen beelden
+    for (let q = 0; q < 14; q++){ const sp = randomSpot(40); if (!sp) continue;
+      const pil = new THREE.Mesh(G('ruinpil', () => new THREE.CylinderGeometry(9, 10, 70, 12)), q % 3 ? moss : mossDark);
+      if (q % 2){ pil.rotation.z = Math.PI/2; pil.position.set(sp[0], 9, sp[1]); pil.rotation.y = R()*6; } else pil.position.set(sp[0], 35 - R()*25, sp[1]);
+      pil.castShadow = true; addW(pil); }
+  }
+  if (TR.theme === 'gp'){
+    // grote tribune aan de overkant van het rechte stuk en een groot scherm
+    const gi = 18, sd = -outerSide[gi] || 1, p = P(gi), n = nrm(gi), cx = p.x + n.x*sd*(WALL+90), cz = p.y + n.y*sd*(WALL+90);
+    let free = true; for (let j = 0; j < N && free; j += 2){ const di = Math.min(Math.abs(gi-j), N-Math.abs(gi-j)); if (di > 20 && Math.hypot(PTS[j].x-cx, PTS[j].y-cz) < WALL+160) free = false; }
+    if (free && noTree.every(o => Math.hypot(o.x-cx, o.z-cz) > 380)){
+      const g = onTrack(gi, sd*(WALL+34), -p.h); if (sd === 1) g.rotation.y += Math.PI;
+      const conc = new THREE.MeshStandardMaterial({ color: 0xbdbdbd, roughness: .9 });
+      for (let t = 0; t < 6; t++){ const b = new THREE.Mesh(rbox(380, 12 + t*12, 20, 2), conc); b.position.set(0, (12 + t*12)/2, -t*20); g.add(b); }
+      const crowd = new THREE.InstancedMesh(new THREE.BoxGeometry(7, 13, 6), new THREE.MeshLambertMaterial(), 240), m = new THREE.Matrix4(), c = new THREE.Color(), rc = rng(77); let k2 = 0;
+      for (let t = 0; t < 6; t++) for (let x = -182; x < 182 && k2 < 240; x += 9){ if (rc() < 0.1) continue; m.makeTranslation(x + rc()*3, 12 + t*12 + 6.5, -t*20 + 2); crowd.setMatrixAt(k2, m); c.setHSL(rc(), 0.7, 0.45 + rc()*0.2); crowd.setColorAt(k2, c); k2++; }
+      crowd.count = k2; g.add(crowd); worldAnims.push(t => { crowd.position.y = Math.max(0, Math.sin(t*5)) * 1.4; });
+      const screenTex = canvasTex(256, 128, (gg, w, h) => { gg.fillStyle = '#0d1b2a'; gg.fillRect(0, 0, w, h); gg.fillStyle = '#ffeb3b'; gg.font = '900 34px system-ui,sans-serif'; gg.textAlign = 'center'; gg.fillText('TURBO', w/2, 52); gg.fillStyle = '#fff'; gg.fillText('GRAND PRIX', w/2, 94); });
+      const scr = new THREE.Mesh(rbox(110, 56, 4, 2), [new THREE.MeshBasicMaterial({ map: screenTex })]);
+      scr.material = new THREE.MeshBasicMaterial({ map: screenTex }); scr.position.set(0, 150, -120); g.add(scr);
+      for (const x of [-40, 40]){ const pole = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 130, 8), metal); pole.position.set(x, 65, -122); g.add(pole); }
+      shadows(g); noTree.push({ x: g.position.x, z: g.position.z });
+    }
+  }
   weather.visible = !!TH.weather;
-  if (TH.weather){ weatherMat.color.setHex(TH.weather === 'snow' ? 0xffffff : 0xff8a50); weatherMat.size = TH.weather === 'snow' ? 7 : 5;
-    weatherMat.blending = TH.weather === 'snow' ? THREE.NormalBlending : THREE.AdditiveBlending; weatherMat.needsUpdate = true; }
+  if (TH.weather){
+    const W2 = { snow: [0xffffff, 7, THREE.NormalBlending, 0.9], ash: [0xff8a50, 5, THREE.AdditiveBlending, 0.9], rain: [0xb8d4ee, 3.2, THREE.NormalBlending, 0.55] }[TH.weather];
+    weatherMat.color.setHex(W2[0]); weatherMat.size = W2[1]; weatherMat.blending = W2[2]; weatherMat.opacity = W2[3]; weatherMat.needsUpdate = true; }
 }
 
 // ================= Weer (sneeuw / as) =================
@@ -1090,7 +1167,7 @@ function updateWeather(dt){
   const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, snow = TH.weather === 'snow';
   for (let i = 0; i < WN; i++){
     let x = wPos[i*3], y = wPos[i*3+1], z = wPos[i*3+2];
-    y += (snow ? -70 : 45)*dt; x += Math.sin(simT + i)*12*dt;
+    y += (snow ? -70 : TH.weather === 'rain' ? -720 : 45)*dt; x += Math.sin(simT + i)*12*dt;
     if (y < cy - 250) y += 600; if (y > cy + 350) y -= 600;
     if (x - cx > 800) x -= 1600; if (x - cx < -800) x += 1600;
     if (z - cz > 800) z -= 1600; if (z - cz < -800) z += 1600;
@@ -1161,7 +1238,7 @@ function bakeStatic(group, keep = new Set()){
 }
 
 // ================= Karts =================
-// Gedeelde vormen worden één keer gemaakt en door alle karts hergebruikt (scheelt rekenkracht).
+// Gedeelde vormen worden één keer gemaakt en door alle wagens hergebruikt (scheelt rekenkracht).
 const geoCache = {};
 const G = (key, make) => geoCache[key] || (geoCache[key] = make());
 // blok met afgeronde randen
@@ -1187,103 +1264,118 @@ const tireMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.9
 const rimMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, metalness: 0.8, roughness: 0.3 });
 const carbon = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.55, metalness: 0.3 });
 const chrome = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.2 });
-const visorMat = new THREE.MeshStandardMaterial({ color: 0x101820, metalness: 0.5, roughness: 0.1 });
 const visorGlass = new THREE.MeshStandardMaterial({ color: 0x223344, metalness: 0.6, roughness: 0.05, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
 const headMat = new THREE.MeshBasicMaterial({ color: 0xfffde7 });
 const eyeMat = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.3 });
+const eyeWhite = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+const blushMat = new THREE.MeshStandardMaterial({ color: 0xff8a80, roughness: 0.7, transparent: true, opacity: 0.5 });
 const gloveMat = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.8 });
 const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
 const SKINS = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xd9a07b];
+const HAIR_COLS = [0x2b1b17, 0x6d4c41, 0xe8c15a, 0xb23c17, 0x1b1b1b, 0x8d6e63, 0xd7ccc8];
+const HAIR_STYLES = ['pony', 'staart', 'krul', 'kort'];
 const UPV = new THREE.Vector3(0, 1, 0);
-// staaf tussen twee punten in 3D (armen, benen, romp)
+// staaf tussen twee punten in 3D (armen, benen, romp, buizen)
 function limb3(parent, mat, r1, r2, a, b){
   const A = new THREE.Vector3(a[0], a[1], a[2] || 0), Bv = new THREE.Vector3(b[0], b[1], b[2] || 0), dv = Bv.clone().sub(A), len = dv.length();
   const m = new THREE.Mesh(G('cyl' + r1 + '_' + r2 + '_' + len.toFixed(1), () => new THREE.CylinderGeometry(r2, r1, len, 14)), mat);
   m.position.copy(A).add(Bv).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(UPV, dv.normalize()); parent.add(m); return m;
 }
-// staaf in het zijvlak (voor de voorvork en achterbrug van de motor)
 function limb(parent, mat, r, a, b){ return limb3(parent, mat, r, r*0.9, a, b); }
 const lerp3 = (a, b, t) => [a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, (a[2] || 0) + ((b[2] || 0) - (a[2] || 0))*t];
+const numTexCache = {};
+function numberTex(n){
+  return numTexCache[n] || (numTexCache[n] = canvasTex(64, 64, (g,w,h) => { g.fillStyle = '#fff'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill();
+    g.fillStyle = '#111'; g.font = '900 38px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(n, 32, 34); }));
+}
 
-// een menselijk poppetje: P bepaalt de houding (zittend in een kart of voorovergebogen op een motor)
+// een menselijk poppetje: P bepaalt de houding. Geeft het hoofd terug (dat beweegt los).
 function makeDriver(parent, d, suit, P){
-  const skinI = [...d.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % SKINS.length;
-  const skin = new THREE.MeshStandardMaterial({ color: SKINS[skinI], roughness: 0.65 });
-  const helmet = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.3, roughness: 0.25, side: THREE.DoubleSide });
-  const put = (geo, mat, p) => { const m = new THREE.Mesh(geo, mat); m.position.set(p[0], p[1], p[2] || 0); parent.add(m); return m; };
+  const di = Math.max(0, DRIVERS.findIndex(x => x.name === d.name));
+  const skin = new THREE.MeshStandardMaterial({ color: SKINS[(di*5 + 1) % SKINS.length], roughness: 0.65 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: HAIR_COLS[(di*3 + 2) % HAIR_COLS.length], roughness: 0.75 });
+  const helmet = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.3, roughness: 0.22, side: THREE.DoubleSide });
+  const put = (geo, mat, p, par = parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(p[0], p[1], p[2] || 0); par.add(m); return m; };
   const hip = [P.hip[0], P.hip[1], 0], sh = [P.sh[0], P.sh[1], 0];
-  // romp in racepak, met een witte streep
+  // romp in racepak met een witte streep
   put(sph(6, 16), suit, hip).scale.set(1, 0.8, 1.05);
   limb3(parent, suit, 6, 5.4, hip, sh);
   put(sph(5.6, 16), suit, [sh[0], sh[1] - 1, 0]).scale.set(0.95, 0.8, 1.15);
   limb3(parent, stripeMat, 6.15, 6.0, lerp3(hip, sh, 0.42), lerp3(hip, sh, 0.52));
-  // nek en hoofd met gezicht
-  limb3(parent, skin, 2, 1.9, [sh[0], sh[1] + 1, 0], [P.head[0] - 0.6, P.head[1] - 4.2, 0]);
-  put(sph(5.1, 22), skin, P.head).scale.set(1, 1.08, 0.95);
-  for (const s of [-1, 1]){ put(sph(0.75, 8), eyeMat, [P.head[0] + 4.5, P.head[1] + 0.9, s*1.8]); }
-  put(sph(0.9, 8), skin, [P.head[0] + 5.1, P.head[1] - 0.5, 0]);                                         // neus
-  put(G('mouth', () => new THREE.BoxGeometry(0.5, 0.45, 2.2)), eyeMat, [P.head[0] + 4.7, P.head[1] - 2.3, 0]);   // mond
-  // open helm met vizier
-  put(G('helm', () => new THREE.SphereGeometry(6.3, 26, 18, Math.PI + 0.95, Math.PI*2 - 1.9, 0, Math.PI*0.78)), helmet, P.head);
-  put(G('visor', () => new THREE.SphereGeometry(6.6, 20, 8, Math.PI - 0.95, 1.9, 0.42, 0.62)), visorGlass, P.head);
+  limb3(parent, skin, 2, 1.9, [sh[0], sh[1] + 1, 0], [P.head[0] - 0.6, P.head[1] - 4.2, 0]);   // nek
+  // hoofd (los, zodat het kan bewegen)
+  const head = new THREE.Group(); head.position.set(P.head[0], P.head[1], 0); parent.add(head);
+  put(sph(5.1, 22), skin, [0, 0, 0], head).scale.set(1, 1.08, 0.95);
   for (const s of [-1, 1]){
-    // armen met elleboog en handschoen
+    put(sph(1.05, 10), eyeWhite, [4.15, 0.9, s*1.85], head);                    // oogwit
+    put(sph(0.6, 8), eyeMat, [4.95, 0.9, s*1.85], head);                       // pupil
+    const brow = put(G('brow', () => new THREE.BoxGeometry(0.45, 0.45, 1.8)), hairMat, [4.75, 2.45, s*1.95], head); brow.rotation.x = s*0.18;
+    put(sph(1.15, 8), blushMat, [3.9, -0.9, s*3.0], head);                      // blosjes
+  }
+  put(sph(0.95, 8), skin, [5.15, -0.4, 0], head);                               // neus
+  const smile = put(G('smile', () => new THREE.TorusGeometry(1.35, 0.3, 6, 14, Math.PI)), eyeMat, [4.75, -1.85, 0], head);
+  smile.rotation.set(0, Math.PI/2, Math.PI);                                     // lachende mond
+  // haar: pony, en per coureur een andere stijl
+  const style = HAIR_STYLES[di % HAIR_STYLES.length];
+  const fr = put(sph(3, 14), hairMat, [3.3, 3.55, 0], head); fr.scale.set(0.7, 0.42, 1.25); fr.rotation.z = -0.35;   // ronde pony
+  if (style === 'staart'){ put(sph(2.2, 10), hairMat, [-6.4, -0.8, 0], head); limb3(head, hairMat, 1.7, 1.1, [-6.8, -1.2, 0], [-9.2, -7.5, 0]); put(sph(1.2, 8), hairMat, [-9.3, -7.8, 0], head); }
+  if (style === 'krul') for (const [x, y, z] of [[-5.6, -3.4, 3.2], [-5.6, -3.4, -3.2], [-6.3, -1.8, 0], [-4.2, -4.6, 4.6], [-4.2, -4.6, -4.6], [-6.2, -4.2, 0]]) put(sph(1.7, 10), hairMat, [x, y, z], head);
+  if (style === 'kort') for (const s of [-1, 1]) put(G('burn', () => new THREE.BoxGeometry(1.4, 2.6, 0.8)), hairMat, [2.6, -1.5, s*4.75], head);
+  // open helm met vizier en streep
+  put(G('helm', () => new THREE.SphereGeometry(6.3, 26, 18, Math.PI + 0.95, Math.PI*2 - 1.9, 0, Math.PI*0.78)), helmet, [0, 0, 0], head);
+  put(G('visor', () => new THREE.SphereGeometry(6.6, 20, 8, Math.PI - 0.95, 1.9, 0.42, 0.62)), visorGlass, [0, 0, 0], head);
+  const stripe = put(G('hstripe', () => new THREE.TorusGeometry(6.38, 0.7, 6, 26, 1.95)), stripeMat, [0, 0, 0], head); stripe.rotation.z = 0.75;
+  for (const s of [-1, 1]){
     const shp = [sh[0], sh[1], s*P.shW], el = [P.el[0], P.el[1], s*P.el[2]], ha = [P.hand[0], P.hand[1], s*P.hand[2]];
     put(sph(3, 12), suit, shp);
     limb3(parent, suit, 2.4, 2.1, shp, el); put(sph(2.1, 10), suit, el);
     limb3(parent, suit, 2.0, 1.7, el, ha); put(sph(2.1, 10), gloveMat, ha);
-    // benen met knie en schoen
     const hp = [hip[0], hip[1], s*3.4], kn = [P.knee[0], P.knee[1], s*P.knee[2]], ft = [P.foot[0], P.foot[1], s*P.foot[2]];
     limb3(parent, suit, 3.0, 2.6, hp, kn); put(sph(2.6, 10), suit, kn);
     limb3(parent, suit, 2.4, 2.1, kn, ft);
     put(sph(2.4, 10), gloveMat, ft).scale.set(1.6, 0.8, 1);
   }
+  return head;
 }
 const KART_POSE = { hip: [-6, 12.5], sh: [-4.5, 25], head: [-3, 32], shW: 6, el: [2.5, 18.5, 8.5], hand: [10.2, 21, 4.6], knee: [7, 15.5, 5.5], foot: [16, 9.5, 5] };
 const BIKE_POSE = { hip: [-7, 25], sh: [4, 33.5], head: [9.5, 38.5], shW: 6, el: [9, 27.5, 8.5], hand: [13.5, 28.5, 9.5], knee: [4, 19, 7.5], foot: [-2, 10.5, 7.5] };
+const F1_POSE   = { hip: [-3, 9.5], sh: [0, 18.5], head: [2, 25], shW: 5.5, el: [6.5, 15, 7], hand: [10.5, 17.5, 3.6], knee: [10, 12.5, 4.5], foot: [20, 9, 4] };
+const BUGGY_POSE = { hip: [-4, 23], sh: [-2.5, 35.5], head: [-1, 42.5], shW: 6, el: [4.5, 29, 8.5], hand: [11.5, 31, 4.8], knee: [8.5, 25.5, 5.5], foot: [17, 19, 5] };
 
-function makeBikeMesh(d){
+// gemeenschappelijk: basis, wielen, vlam, vonken, schild, startnummer en samenvoegen
+function vehicleBase(d){
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body); root.rotation.order = 'YXZ';
-  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.4, roughness: 0.28 });
-  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).lerp(new THREE.Color(0x1e2430), 0.5), roughness: 0.8 });   // donkerder pak, zodat de helm opvalt
+  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.38, roughness: 0.28 });
+  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).lerp(new THREE.Color(0x1e2430), 0.5), roughness: 0.8 });
   const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
-  const wheels = [], fronts = [];
-  for (const x of [21, -19]){
-    const pivot = new THREE.Group(); pivot.position.set(x, 9.5, 0); body.add(pivot);
+  const wheels = [], fronts = [], keep = [];
+  const wheel = (x, y, z, R, W, front, rimR) => {
+    const pivot = new THREE.Group(); pivot.position.set(x, y, z); body.add(pivot); keep.push(pivot);
     const spin = new THREE.Group(); pivot.add(spin);
-    const t = new THREE.Mesh(tireGeom(9.5, 5), tireMat); t.rotation.x = Math.PI/2; spin.add(t);
-    const r = new THREE.Mesh(G('bikerim', () => new THREE.CylinderGeometry(5.6, 5.6, 5.2, 20)), rimMat); r.rotation.x = Math.PI/2; spin.add(r);
-    const hub = new THREE.Mesh(G('bikehub', () => new THREE.CylinderGeometry(1.8, 1.8, 6.2, 12)), carbon); hub.rotation.x = Math.PI/2; spin.add(hub);
-    wheels.push(spin);
-    if (x > 0){ fronts.push(pivot); limb(pivot, chrome, 1.4, [0, 0, 3.5], [-6, 16, 3.5]); limb(pivot, chrome, 1.4, [0, 0, -3.5], [-6, 16, -3.5]); }
-  }
-  limb(body, carbon, 3, [-19, 9.5, 0], [-2, 13, 0]);                           // achterbrug
-  add(rbox(26, 7, 7, 2.5), carbon, 2, 15, 0);                                    // frame
-  add(rbox(14, 8, 10, 2.5), carbon, 0, 10.5, 0);                                 // motorblok
-  add(rbox(16, 9, 13, 4), paint, 6, 21, 0);                                      // tank
-  const fairing = add(rbox(11, 16, 13, 4), paint, 16, 21, 0); fairing.rotation.z = -0.4;   // voorkuip
-  add(rbox(5, 7, 10, 1.5), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, metalness: .3, roughness: .1, transparent: true, opacity: .7 }), 20, 29.5, 0);  // windscherm
-  add(rbox(2, 3, 5, 0.8), headMat, 22.8, 19, 0);                                 // koplamp
-  add(rbox(14, 4, 10, 1.8), carbon, -6, 22.5, 0);                                // zadel
-  const tail = add(rbox(12, 6, 9, 2.5), paint, -16, 22, 0); tail.rotation.z = 0.25;
-  const ex = add(G('bikeexh', () => new THREE.CylinderGeometry(2, 2.4, 16, 14)), chrome, -14, 12, 6); ex.rotation.z = Math.PI/2 - 0.2;   // uitlaat
-  add(rbox(3, 2, 22, 0.9), carbon, 13, 28, 0);                                   // stuur
-  makeDriver(body, d, suit, BIKE_POSE);
-  const flame = add(new THREE.ConeGeometry(3.5, 20, 12), new THREE.MeshBasicMaterial({ color: 0xff9100 }), -28, 12, 6); flame.rotation.z = Math.PI/2;
-  const sparkMat = new THREE.MeshBasicMaterial({ color: 0x40c4ff });
-  const sparks = [add(sph(3.5, 8), sparkMat, -19, 2, 5), add(sph(3.5, 8), sparkMat, -19, 2, -5)];
-  bakeStatic(body, new Set([...fronts, ...wheels.map(w => w.parent), flame, ...sparks]));
-  shadows(body, true, false); flame.castShadow = false; sparks.forEach(s => s.castShadow = false);
-  const shield = new THREE.Mesh(sph(36, 18), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
-  shield.position.y = 20; root.add(shield);
-  scene.add(root);
-  return { root, body, flame, sparks, sparkMat, shield, wheels, fronts, bike: true };
+    const t = new THREE.Mesh(tireGeom(R, W), tireMat); t.rotation.x = Math.PI/2; spin.add(t);
+    const r = new THREE.Mesh(G('rim' + R + W, () => new THREE.CylinderGeometry(rimR || R*0.6, rimR || R*0.6, W*1.02, 20)), rimMat); r.rotation.x = Math.PI/2; spin.add(r);
+    const hub = new THREE.Mesh(G('hub' + W, () => new THREE.CylinderGeometry(1.5, 1.5, W*1.1, 10)), carbon); hub.rotation.x = Math.PI/2; spin.add(hub);
+    wheels.push(spin); if (front) fronts.push(pivot); return pivot;
+  };
+  const numMat = new THREE.MeshBasicMaterial({ map: numberTex(Math.max(1, DRIVERS.findIndex(x => x.name === d.name) + 1)), transparent: true });
+  const number = (x, y, z, ry, size = 8) => { const p = add(G('numplane' + size, () => new THREE.PlaneGeometry(size, size)), numMat, x, y, z); p.rotation.y = ry; keep.push(p); };
+  const finish = (flamePos, sparkPos, shieldY, head) => {
+    const flame = add(G('flame', () => new THREE.ConeGeometry(4, 22, 12)), new THREE.MeshBasicMaterial({ color: 0xff9100 }), ...flamePos); flame.rotation.z = Math.PI/2;
+    const sparkMat = new THREE.MeshBasicMaterial({ color: 0x40c4ff });
+    const sparks = sparkPos.map(p => add(sph(3.5, 8), sparkMat, ...p));
+    if (head) bakeStatic(head);                       // het hoofd als één geheel (beweegt nog wel)
+    bakeStatic(body, new Set([...keep, flame, ...sparks, head]));
+    shadows(body, true, false); flame.castShadow = false; sparks.forEach(s => s.castShadow = false);
+    const shield = new THREE.Mesh(sph(40, 18), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
+    shield.position.y = shieldY; root.add(shield);
+    scene.add(root);
+    return { root, body, flame, sparks, sparkMat, shield, wheels, fronts, head };
+  };
+  return { root, body, paint, suit, add, wheel, number, finish };
 }
+
 function makeKartMesh(d){
-  const root = new THREE.Group(), body = new THREE.Group(); root.add(body); root.rotation.order = 'YXZ';
-  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.35, roughness: 0.3 });
-  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).lerp(new THREE.Color(0x1e2430), 0.5), roughness: 0.8 });   // donkerder pak, zodat de helm opvalt
-  const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const V = vehicleBase(d), { add, paint, suit, body } = V;
   add(rbox(46, 3, 24, 1.2), carbon, 0, 5.5, 0);                                  // vloerplaat
   for (const s of [-1, 1]) add(rbox(22, 7, 9, 3), paint, 2, 9, s*14.5);          // zijbakken
   const nose = add(rbox(18, 6.5, 22, 3), paint, 24, 8.5, 0); nose.rotation.z = -0.18;
@@ -1293,28 +1385,82 @@ function makeKartMesh(d){
   add(rbox(12, 9, 14, 2.5), carbon, -18, 11, 0);                                 // motor
   for (const z of [-4, 4]){ const ex = add(G('exh', () => new THREE.CylinderGeometry(1.6, 1.8, 11, 14)), chrome, -25.5, 14, z); ex.rotation.z = Math.PI/2; }
   add(rbox(13, 3, 15, 1.3), carbon, -6, 9.5, 0);                                 // stoel
-  const back = add(rbox(3, 13, 15, 1.3), carbon, -12, 16, 0); back.rotation.z = 0.12;   // rugleuning
+  const back = add(rbox(3, 13, 15, 1.3), carbon, -12, 16, 0); back.rotation.z = 0.12;
   const column = add(G('column', () => new THREE.CylinderGeometry(0.9, 0.9, 12, 10)), carbon, 14, 15.5, 0); column.rotation.z = 1.05;
-  const wheel = add(G('swheel', () => new THREE.TorusGeometry(4.6, 0.9, 10, 28)), carbon, 10.5, 20.5, 0); wheel.rotation.y = Math.PI/2; wheel.rotation.x = 0.4;
-  makeDriver(body, d, suit, KART_POSE);
-  const wheels = [], fronts = [];
-  for (const [x, z] of [[17,15],[17,-15],[-16,16],[-16,-16]]){
-    const pivot = new THREE.Group(); pivot.position.set(x, 7.5, z); body.add(pivot);
-    const spin = new THREE.Group(); pivot.add(spin);
-    const t = new THREE.Mesh(tireGeom(7.5, 8), tireMat); t.rotation.x = Math.PI/2; spin.add(t);
-    const r = new THREE.Mesh(G('rim', () => new THREE.CylinderGeometry(4.5, 4.5, 8.2, 20)), rimMat); r.rotation.x = Math.PI/2; spin.add(r);
-    const hub = new THREE.Mesh(G('hub', () => new THREE.CylinderGeometry(1.5, 1.5, 8.8, 10)), carbon); hub.rotation.x = Math.PI/2; spin.add(hub);
-    wheels.push(spin); if (x > 0) fronts.push(pivot);
+  const sw = add(G('swheel', () => new THREE.TorusGeometry(4.6, 0.9, 10, 28)), carbon, 10.5, 20.5, 0); sw.rotation.y = Math.PI/2; sw.rotation.x = 0.4;
+  const head = makeDriver(body, d, suit, KART_POSE);
+  for (const [x, z] of [[17,15],[17,-15],[-16,16],[-16,-16]]) V.wheel(x, 7.5, z, 7.5, 8, x > 0);
+  V.number(2, 9, 19.1, 0); V.number(2, 9, -19.1, Math.PI);
+  return V.finish([-36, 14, 0], [[-18, 3, 17], [-18, 3, -17]], 18, head);
+}
+function makeBikeMesh(d){
+  const V = vehicleBase(d), { add, paint, suit, body } = V;
+  for (const x of [21, -19]){
+    const pivot = V.wheel(x, 9.5, 0, 9.5, 5, x > 0, 5.6);
+    if (x > 0){ limb(pivot, chrome, 1.4, [0, 0, 3.5], [-6, 16, 3.5]); limb(pivot, chrome, 1.4, [0, 0, -3.5], [-6, 16, -3.5]); }
   }
-  const flame = add(new THREE.ConeGeometry(4, 22, 12), new THREE.MeshBasicMaterial({ color: 0xff9100 }), -36, 14, 0); flame.rotation.z = Math.PI/2;
-  const sparkMat = new THREE.MeshBasicMaterial({ color: 0x40c4ff });
-  const sparks = [add(sph(3.5, 8), sparkMat, -18, 3, 17), add(sph(3.5, 8), sparkMat, -18, 3, -17)];
-  bakeStatic(body, new Set([...wheels.map(w => w.parent), flame, ...sparks]));
-  shadows(body, true, false); flame.castShadow = false; sparks.forEach(s => s.castShadow = false);
-  const shield = new THREE.Mesh(sph(38, 18), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
-  shield.position.y = 18; root.add(shield);
-  scene.add(root);
-  return { root, body, flame, sparks, sparkMat, shield, wheels, fronts };
+  limb(body, carbon, 3, [-19, 9.5, 0], [-2, 13, 0]);                             // achterbrug
+  add(rbox(26, 7, 7, 2.5), carbon, 2, 15, 0);                                    // frame
+  add(rbox(14, 8, 10, 2.5), carbon, 0, 10.5, 0);                                 // motorblok
+  add(rbox(16, 9, 13, 4), paint, 6, 21, 0);                                      // tank
+  const fairing = add(rbox(11, 16, 13, 4), paint, 16, 21, 0); fairing.rotation.z = -0.4;
+  add(rbox(5, 7, 10, 1.5), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, metalness: .3, roughness: .1, transparent: true, opacity: .7 }), 20, 29.5, 0);
+  add(rbox(2, 3, 5, 0.8), headMat, 22.8, 19, 0);
+  add(rbox(14, 4, 10, 1.8), carbon, -6, 22.5, 0);
+  const tail = add(rbox(12, 6, 9, 2.5), paint, -16, 22, 0); tail.rotation.z = 0.25;
+  const ex = add(G('bikeexh', () => new THREE.CylinderGeometry(2, 2.4, 16, 14)), chrome, -14, 12, 6); ex.rotation.z = Math.PI/2 - 0.2;
+  add(rbox(3, 2, 22, 0.9), carbon, 13, 28, 0);
+  const head = makeDriver(body, d, suit, BIKE_POSE);
+  V.number(-16, 22, 4.8, 0, 6); V.number(-16, 22, -4.8, Math.PI, 6);
+  const M = V.finish([-28, 12, 6], [[-19, 2, 5], [-19, 2, -5]], 20, head); M.bike = true; return M;
+}
+// formulewagen: lang en laag met vleugels
+function makeFormulaMesh(d){
+  const V = vehicleBase(d), { add, paint, suit, body } = V;
+  add(rbox(40, 7, 14, 3), paint, 0, 8.5, 0);                                     // kuip
+  limb3(body, paint, 4.6, 2.2, [19, 8.5, 0], [40, 6.5, 0]);                      // neus
+  add(rbox(7, 1.4, 42, 0.6), carbon, 41, 3.5, 0);                                // voorvleugel
+  for (const s of [-1, 1]) add(rbox(8, 5, 1, 0.4), paint, 41, 5.5, s*21);
+  for (const s of [-1, 1]) add(rbox(20, 7, 8, 3), paint, -5, 8.5, s*10.5);       // zijkasten
+  add(rbox(24, 8, 9, 3.5), paint, -12, 14, 0);                                   // motorkap
+  add(rbox(6, 6, 7, 2.5), carbon, -1, 19.5, 0);                                  // luchtinlaat
+  add(rbox(6, 1.6, 36, 0.6), carbon, -31, 25, 0); add(rbox(5, 1.4, 36, 0.6), paint, -29, 21.5, 0);   // achtervleugel
+  for (const s of [-1, 1]){ add(rbox(9, 13, 1, 0.4), paint, -30, 21, s*18); limb3(body, carbon, 0.9, 0.9, [-24, 12, s*4], [-29, 21, s*4]); }
+  const ex = add(G('f1exh', () => new THREE.CylinderGeometry(1.8, 2.2, 8, 14)), chrome, -26, 11, 0); ex.rotation.z = Math.PI/2;
+  const sw = add(G('f1wheel', () => new THREE.TorusGeometry(3.3, 0.7, 8, 22)), carbon, 10.5, 17.5, 0); sw.rotation.y = Math.PI/2; sw.rotation.x = 0.35;
+  for (const s of [-1, 1]) limb3(body, carbon, 1, 1, [5, 13, s*5], [3, 22, s*3.5]);  // halo
+  limb3(body, carbon, 1, 1, [3, 22, -3.5], [3, 22, 3.5]); limb3(body, carbon, 1, 1, [3, 22, 0], [15, 13, 0]);
+  const head = makeDriver(body, d, suit, F1_POSE);
+  for (const s of [-1, 1]){ V.wheel(26, 7.5, s*18, 7.5, 7, true); V.wheel(-20, 9, s*19, 9, 10, false); }
+  V.number(-12, 18.2, 0, 0, 7); body.children[body.children.length - 1].rotation.set(-Math.PI/2, 0, 0);
+  return V.finish([-34, 11, 0], [[-20, 2, 19], [-20, 2, -19]], 16, head);
+}
+// buggy: grote terreinwielen en een rolkooi
+function makeBuggyMesh(d){
+  const V = vehicleBase(d), { add, paint, suit, body } = V;
+  add(rbox(42, 4, 22, 1.5), carbon, 0, 13, 0);                                   // bodemplaat
+  add(rbox(30, 8, 20, 3), paint, 0, 18.5, 0);                                    // bak
+  const hood = add(rbox(14, 6, 20, 2.5), paint, 15, 19, 0); hood.rotation.z = -0.25;
+  for (const s of [-1, 1]){ limb3(body, chrome, 1.2, 1.2, [20, 14, s*10], [30, 12.5, s*10]); add(sph(2.2, 12), headMat, 23, 22, s*6); }
+  add(rbox(3, 3, 26, 1), chrome, 30.5, 13, 0);                                   // bumper
+  // rolkooi
+  for (const s of [-1, 1]){
+    limb3(body, chrome, 1.1, 1.1, [-11, 21, s*10], [-11, 50, s*9]);
+    limb3(body, chrome, 1.1, 1.1, [8, 21, s*10], [2, 48, s*9]);
+    limb3(body, chrome, 1.1, 1.1, [-11, 50, s*9], [2, 48, s*9]);
+    limb3(body, chrome, 1.1, 1.1, [-11, 50, s*9], [-21, 21, s*10]);
+  }
+  limb3(body, chrome, 1.1, 1.1, [-11, 50, -9], [-11, 50, 9]); limb3(body, chrome, 1.1, 1.1, [2, 48, -9], [2, 48, 9]);
+  add(rbox(10, 9, 14, 2.5), carbon, -19, 21, 0);                                 // motor
+  limb3(body, chrome, 1.6, 1.4, [-22, 22, 4], [-25, 31, 4]);                     // uitlaat omhoog
+  add(rbox(13, 3, 15, 1.3), carbon, -4, 20, 0);                                  // stoel
+  const back = add(rbox(3, 14, 15, 1.3), carbon, -10, 27, 0); back.rotation.z = 0.12;
+  const column = add(G('column', () => new THREE.CylinderGeometry(0.9, 0.9, 12, 10)), carbon, 15.5, 25, 0); column.rotation.z = 1.05;
+  const sw = add(G('swheel', () => new THREE.TorusGeometry(4.6, 0.9, 10, 28)), carbon, 11.5, 30.5, 0); sw.rotation.y = Math.PI/2; sw.rotation.x = 0.4;
+  const head = makeDriver(body, d, suit, BUGGY_POSE);
+  for (const [x, z] of [[19,18],[19,-18],[-17,18],[-17,-18]]) V.wheel(x, 11, z, 11, 10, x > 0, 6);
+  V.number(0, 18.5, 10.15, 0); V.number(0, 18.5, -10.15, Math.PI);
+  return V.finish([-27, 22, 0], [[-17, 2, 18], [-17, 2, -18]], 26, head);
 }
 
 // ================= Spelstatus =================
@@ -1324,20 +1470,22 @@ let camH = 0, shake = 0; const camPos = new THREE.Vector3(), camTgt = new THREE.
 
 // voertuigen: de motor is wendbaarder en trekt sneller op, maar is lichter bij botsingen
 const VEHICLES = {
-  kart: { name: 'Kart', icon: '🏎️', desc: 'Stevig, duwt anderen weg', top: 1, acc: 1, turn: 1, mass: 1 },
-  bike: { name: 'Motor', icon: '🏍️', desc: 'Wendbaar en snel weg, maar licht', top: 0.97, acc: 1.08, turn: 1.12, mass: 0.7 },
+  kart:    { name: 'Kart',         icon: '🏎️', desc: 'Stevig en wendbaar', top: 1, acc: 1, turn: 1, mass: 1, off: 1 },
+  bike:    { name: 'Motor',        icon: '🏍️', desc: 'Super wendbaar, maar licht', top: 0.97, acc: 1.08, turn: 1.12, mass: 0.7, off: 0.9 },
+  formula: { name: 'Formulewagen', icon: '🏁', desc: 'Supersnel rechtdoor', top: 1.07, acc: 0.93, turn: 0.93, mass: 1.05, off: 0.8 },
+  buggy:   { name: 'Buggy',        icon: '🚙', desc: 'Raast door gras en zand', top: 0.96, acc: 1.02, turn: 0.98, mass: 1.2, off: 1.7 },
 };
-const AI_BIKES = new Set([1, 4, 8, 11]);   // Luna, Rico en Jesse rijden als computerspeler op een motor
-let vehicle = 'kart'; try { if (localStorage.getItem('turbokarts_vehicle') === 'bike') vehicle = 'bike'; } catch(e){}
+const AI_VEH = { 1: 'bike', 4: 'bike', 8: 'bike', 11: 'bike', 2: 'buggy', 10: 'buggy', 6: 'formula', 9: 'formula' };   // wat de bots rijden   // Luna, Rico en Jesse rijden als computerspeler op een motor
+let vehicle = 'kart'; try { const sv = localStorage.getItem('turbokarts_vehicle'); if (sv in VEHICLES) vehicle = sv; } catch(e){}
 function makeCar(d, ai, skill, gridIdx, side, veh = 'kart'){
   const V = VEHICLES[veh] || VEHICLES.kart;
-  d = { ...d, top: d.top*V.top, acc: d.acc*V.acc, turn: d.turn*V.turn, vehicle: veh, mass: V.mass };
+  d = { ...d, top: d.top*V.top, acc: d.acc*V.acc, turn: d.turn*V.turn, vehicle: veh, mass: V.mass, offroad: V.off };
   const dd = dir(gridIdx), p = P(gridIdx);
   return { ...d, ai, skill, x: p.x - dd.y*side, y: p.y + dd.x*side, z: p.h, vz: 0, air: false, slope: 0, slopeVis: 0,
     h: Math.atan2(dd.y, dd.x), vx:0, vy:0, vf:0, vr:0, steerSm:0,
     idx: ((gridIdx%N)+N)%N, total: gridIdx-N, maxFloor:-1, dist:0, lapStart:0, lastLap:null, best:null, finished:false, finishTime:0,
     phase: Math.random()*6, rubber:1, drifting:false, driftDir:0, charge:0, hopT:0, boostT:0, spinT:0, spinA:0, yawVis:0, shieldT:0,
-    item:null, itemCount:0, rollT:0, aiUseT:0, roll:0, pitch:0, prevVf:0, wheelA:0, emitT:0, prevW:null, stallT:0, gasAt:null, mesh: veh === 'bike' ? makeBikeMesh(d) : makeKartMesh(d) };
+    item:null, itemCount:0, rollT:0, aiUseT:0, roll:0, pitch:0, prevVf:0, wheelA:0, emitT:0, prevW:null, stallT:0, gasAt:null, mesh: ({ bike: makeBikeMesh, formula: makeFormulaMesh, buggy: makeBuggyMesh }[veh] || makeKartMesh)(d) };
 }
 function clearRace(){
   for (const c of cars){ scene.remove(c.mesh.root); c.mesh.root.traverse(o => { if (o.geometry && o.geometry.userData.own) o.geometry.dispose(); }); }
@@ -1351,6 +1499,7 @@ const isCup = () => mode === 'cup' || (mode === 'online' && net.sub === 'cup');
 const CUPS = [
   { name: 'Zon Cup', emoji: '☀️', tracks: [0, 1, 5] },
   { name: 'Nacht Cup', emoji: '🌙', tracks: [2, 4, 3] },
+  { name: 'Natuur Cup', emoji: '🌿', tracks: [6, 7, 0] },
 ];
 let cupSel = 0;
 // niveaus van de computerspelers (bots)
@@ -1370,7 +1519,7 @@ function setupRace(){
   const skills = Array.from({ length: RACE_SIZE }, (_, i) => 0.97 - i*0.0085);
   const grid = [[N-2,-80],[N-2,0],[N-2,80],[N-5,-80],[N-5,0],[N-5,80],[N-8,-80],[N-8,0],[N-8,80],[N-11,-80],[N-11,0],[N-11,80]];
   cars = [];
-  ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i]*LV().skill, grid[i][0], grid[i][1], AI_BIKES.has(di) ? 'bike' : 'kart')));
+  ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i]*LV().skill, grid[i][0], grid[i][1], AI_VEH[di] || 'kart')));
   humans.forEach((h, i) => { const g = grid[ais.length + i], c = makeCar(DRIVERS[h.d], false, 0.9, g[0], g[1], h.v || (net.role ? 'kart' : vehicle)); c.owner = h.id; c.itemSeen = 0; cars.push(c); });
   player = cars.find(c => c.owner === (net.role ? net.myId : 'local')) || cars[cars.length-1];
   camH = player.h; camPos.set(player.x - Math.cos(camH)*120, player.z + 48, player.y - Math.sin(camH)*120);
@@ -1378,6 +1527,7 @@ function setupRace(){
 function loadTrack(k){ if (currentTrack !== k) buildTrack(k); }
 function raceUI(){
   for (const id of ['menu','results','podium']) $(id).hidden = true; document.body.classList.add('racing');
+  for (const c of cars) c.mesh.root.visible = true;
   $('hud').hidden = false; $('big').textContent = '';
   showMsg('Tip: geef gas als de 1 verschijnt voor een 🚀 raketstart'); msgT = 3;
   $('trackname').textContent = (isCup() ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name + ' ' + (cupIdx+1) + '/' + cupTracks().length + ' · ' : '🏁 ') + TR.emoji + ' ' + TR.name + ' · ' + LV().icon + ' ' + LV().name + (net.role ? ' · 🌐 online' : '');
@@ -1494,7 +1644,7 @@ function dropPeer(id){
 }
 function hostOnMsg(conn, m){
   if (m.t === 'in') net.inputs[conn.peer] = m;
-  if (m.t === 'driver' && state === 'menu'){ setDriver(conn.peer, m.d); const r = net.roster.find(r => r.id === conn.peer); if (r) r.v = m.v === 'bike' ? 'bike' : 'kart'; sendLobby(); setupRace(); buildMenu(); }
+  if (m.t === 'driver' && state === 'menu'){ setDriver(conn.peer, m.d); const r = net.roster.find(r => r.id === conn.peer); if (r) r.v = m.v in VEHICLES ? m.v : 'kart'; sendLobby(); setupRace(); buildMenu(); }
 }
 function clientOnMsg(m){
   if (m.t === 'full'){ leaveOnline('Dit spel is vol of de race is al bezig'); return; }
@@ -1611,7 +1761,8 @@ function buildMenu(){
   const vb = $('vehicles'); vb.innerHTML = '';
   for (const [key, V] of Object.entries(VEHICLES)){
     const el = document.createElement('div'); el.className = 'vcard' + (key === vehicle ? ' sel' : '');
-    el.innerHTML = `<span class="vi">${V.icon}</span><span><b>${V.name}</b><small>${V.desc}</small></span>`;
+    const vbar = (label, v) => `<div class="stat"><span>${label}</span><div class="bar"><i style="width:${clamp(v, 0.08, 1)*100}%"></i></div></div>`;
+    el.innerHTML = `<span class="vi">${V.icon}</span><span><b>${V.name}</b><small>${V.desc}</small>${vbar("Snelheid", (V.top-0.9)/0.2)}${vbar("Optrek", (V.acc-0.85)/0.3)}${vbar("Sturen", (V.turn-0.85)/0.3)}${vbar("Terrein", (V.off-0.6)/1.2)}</span>`;
     el.onclick = () => chooseVehicle(key);
     vb.appendChild(el);
   }
@@ -1720,6 +1871,7 @@ function updateSteps(){
   $('stepPick2').textContent = mode === 'online' ? '🌐' : mode === 'cup' ? '🏆' : '🏁';
   $('backBtn').hidden = menuStep === 0;
   $('nextStepBtn').hidden = menuStep === 2;
+  $('menu').classList.toggle('showcase', menuStep < 2);
 }
 function goStep(n){ menuStep = clamp(n, 0, 2); buildMenu(); $('menu').scrollTop = 0; }
 $('backBtn').onclick = () => goStep(menuStep - 1);
@@ -1800,7 +1952,7 @@ addEventListener('keydown', e => {
   if (state === 'menu'){
     const left = e.code === 'ArrowLeft' || e.code === 'KeyA', right = e.code === 'ArrowRight' || e.code === 'KeyD';
     if (menuStep === 0 && (left || right)) chooseDriver((selected + (right ? 1 : DRIVERS.length-1)) % DRIVERS.length);
-    if (menuStep === 1 && (left || right)) chooseVehicle(vehicle === 'kart' ? 'bike' : 'kart');
+    if (menuStep === 1 && (left || right)){ const ks = Object.keys(VEHICLES), i = ks.indexOf(vehicle); chooseVehicle(ks[(i + (right ? 1 : ks.length-1)) % ks.length]); }
     if (e.code === 'Enter') menuStep < 2 ? goStep(menuStep + 1) : $('startBtn').click();
     if (e.code === 'Backspace' && menuStep > 0) goStep(menuStep - 1);
     return;
@@ -1935,14 +2087,14 @@ function physics(c, inp, dt){
   const fx = Math.cos(c.h), fy = Math.sin(c.h), rx = -fy, ry = fx;
   let vf = c.vx*fx + c.vy*fy, vr = c.vx*rx + c.vy*ry;
   const off = c.dist > ROAD/2 + CURB && c.boostT <= 0, onIce = P(c.idx).ice && !off, grounded = !c.air;
-  let maxV = (off ? 300 : 640) * c.top * (c.ai ? c.skill*c.rubber : 1), acc = 520*c.acc;
+  let maxV = (off ? Math.min(600, 300*(c.offroad || 1)) : 640) * c.top * (c.ai ? c.skill*c.rubber : 1), acc = 520*c.acc;
   if (c.boostT > 0){ maxV = 920*c.top; acc = 1700; }
   if (onIce) acc *= 0.7;
   acc *= 1.25 - 0.55*clamp(vf/maxV, 0, 1);
   if (grounded){
     if ((inp.up || c.boostT > 0) && vf < maxV) vf += acc*dt;
     if (inp.down){ if (vf > 20) vf -= (onIce ? 500 : 1100)*dt; else if (vf > -180) vf -= 350*dt; }
-    vf -= vf*(off ? 1.9 : 0.28)*dt;
+    vf -= vf*(off ? 1.9/(c.offroad || 1) : 0.28)*dt;
     if (!inp.up && c.boostT <= 0) vf -= Math.sign(vf)*Math.min(Math.abs(vf), 40*dt);
     if (vf > maxV) vf += (maxV-vf)*2*dt;
     vf -= 650*c.slope*dt;                                // zwaartekracht op hellingen
@@ -1991,7 +2143,7 @@ function respawn(c){
   let delta = i - c.idx; if (delta > N/2) delta -= N; if (delta < -N/2) delta += N; c.total += delta; c.idx = i;
   const p = P(i), d = dir(i);
   Object.assign(c, { x: p.x, y: p.y, z: p.h, h: Math.atan2(d.y, d.x), vx:0, vy:0, vf:0, vr:0, vz:0, air:false, spinT:0, spinA:0, drifting:false, boostT:0, slope:0 });
-  if (c === player){ sfx.splash(); showMsg(TR.theme === 'lava' ? '🔥 Oei, in de lava!' : TR.theme === 'desert' ? '🕳️ Oeps, in de kloof!' : 'Oeps! Teruggezet'); shake = 0.6; camH = c.h; }
+  if (c === player){ sfx.splash(); showMsg(TR.theme === 'lava' ? '🔥 Oei, in de lava!' : TR.theme === 'desert' ? '🕳️ Oeps, in de kloof!' : TR.theme === 'jungle' ? '💦 Plons, in de rivier!' : 'Oeps! Teruggezet'); shake = 0.6; camH = c.h; }
 }
 
 function trackProgress(c){
@@ -2247,6 +2399,7 @@ function syncKart(c, dt){
   // motor hangt schuin de bocht in, een kart helt een beetje over
   const lean = M.bike ? clamp(c.steerSm*Math.min(1, Math.abs(c.vf)/350)*0.55 + (c.drifting ? c.driftDir*0.15 : 0), -0.7, 0.7) : c.roll;
   M.body.rotation.set(lean, -(c.yawVis + c.spinA), c.pitch);
+  if (M.head){ M.head.rotation.y = -c.steerSm*0.45; M.head.rotation.z = Math.sin(simT*8 + c.phase)*0.035*Math.min(1, Math.abs(c.vf)/300) + (c.boostT > 0 ? 0.08 : 0); }   // kijkt de bocht in
   c.wheelA -= c.vf*dt/7.5;
   for (const w of M.wheels) w.rotation.z = c.wheelA;
   for (const f of M.fronts) f.rotation.y = -c.steerSm*0.45;
@@ -2290,9 +2443,19 @@ function drawHUD(){
 function updateCamera(dt){
   let fx, fy, fz;
   if (state === 'menu'){
-    const a = simT*0.12, p = P(2);
-    camera.position.set(p.x + Math.cos(a)*300, p.h + 90, p.y + Math.sin(a)*300); camera.lookAt(p.x, p.h + 15, p.y);
-    camera.fov = fovFix(55); camera.updateProjectionMatrix(); fx = p.x; fy = p.h; fz = p.y;
+    const showcase = menuStep < 2 && player;
+    for (const c of cars) c.mesh.root.visible = !showcase || c === player;   // bij het kiezen alleen jouw wagen tonen
+    if (showcase){
+      // de camera draait langzaam om jouw wagen; de wagen staat in de bovenste helft van het scherm
+      const a = player.h + 0.75 + Math.sin(simT*0.35)*0.6, r = (player.vehicle === 'formula' ? 150 : 130)*(innerHeight > innerWidth ? 1.35 : 1), ty = player.z + (player.vehicle === 'buggy' ? 30 : 20);
+      camera.position.set(player.x + Math.cos(a)*r, ty + 42, player.y + Math.sin(a)*r);
+      camera.lookAt(player.x, ty - (innerHeight > innerWidth ? 70 : 48), player.y);   // richt onder de wagen, zodat hij bovenin het beeld staat
+      camera.fov = fovFix(48); camera.updateProjectionMatrix(); fx = player.x; fy = player.z; fz = player.y;
+    } else {
+      const a = simT*0.12, p = P(2);
+      camera.position.set(p.x + Math.cos(a)*300, p.h + 90, p.y + Math.sin(a)*300); camera.lookAt(p.x, p.h + 15, p.y);
+      camera.fov = fovFix(55); camera.updateProjectionMatrix(); fx = p.x; fy = p.h; fz = p.y;
+    }
   } else if (state === 'podium'){
     const c = podiumCenter, a = Math.sin(podiumT*0.35)*0.6, dist = 230;
     camera.position.set(c.x + (c.d.x*Math.cos(a) + c.n.x*Math.sin(a))*dist, c.y + 75, c.z + (c.d.y*Math.cos(a) + c.n.y*Math.sin(a))*dist);
