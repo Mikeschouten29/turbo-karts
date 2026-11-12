@@ -81,7 +81,9 @@
   #onCode b{font-size:38px;letter-spacing:7px;color:#ffeb3b;background:#0006;padding:2px 14px;border-radius:12px;margin-left:6px}
   #onPlayers{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
   #invite{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center}
-  #qrImg{width:132px;height:132px;background:#fff;padding:6px;border-radius:12px;image-rendering:pixelated}
+  #qrCanvas{background:#fff;border-radius:10px;cursor:zoom-in;display:block}
+  #qrBig{position:fixed;inset:0;z-index:50;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#111;cursor:zoom-out}
+  #qrBig b{font-size:22px} #qrBig span{font-size:15px;opacity:.7}
   #inviteSide{display:flex;flex-direction:column;gap:6px;align-items:flex-start;max-width:280px}
   #inviteHelp{font-size:13px;font-weight:600;opacity:.9}
   #inviteUrl{font-size:12px;word-break:break-all;opacity:.75;user-select:text;-webkit-user-select:text}
@@ -190,7 +192,7 @@
     <div id="onLobby" hidden>
       <div id="onCode"></div>
       <div id="invite" hidden>
-        <img id="qrImg" alt="QR-code om mee te doen">
+        <canvas id="qrCanvas" role="img" aria-label="QR-code om mee te doen" title="Tik om te vergroten"></canvas>
         <div id="inviteSide">
           <button id="shareBtn" class="small">📤 Uitnodiging delen</button>
           <div id="inviteHelp">Vrienden scannen de QR-code met hun camera, of tikken op de gedeelde link. Ze doen dan meteen mee.</div>
@@ -231,6 +233,12 @@
     <button id="againBtn">Nog een keer ↻</button>
     <button id="menuBtn" class="alt">Menu</button>
   </div>
+</div>
+
+<div id="qrBig" hidden>
+  <b id="qrBigCode"></b>
+  <canvas id="qrBigCanvas"></canvas>
+  <span>Scan met de camera van je telefoon · tik om te sluiten</span>
 </div>
 
 <div id="podium" class="overlay" hidden>
@@ -1092,9 +1100,28 @@ function updateInvite(){
   qrFor = net.code;
   const url = inviteUrl();
   $('inviteUrl').textContent = url;
-  try { const qr = qrcode(0, 'M'); qr.addData(url); qr.make(); $('qrImg').src = qr.createDataURL(6, 2); $('qrImg').hidden = false; }
-  catch(e){ $('qrImg').hidden = true; }
+  $('qrCanvas').hidden = !drawQR($('qrCanvas'), url, 190);
 }
+// QR-code pixel-perfect tekenen: elk blokje is een heel aantal schermpixels, met een brede witte rand
+function drawQR(canvas, text, cssSize){
+  try {
+    const qr = qrcode(0, 'L'); qr.addData(text); qr.make();
+    const n = qr.getModuleCount(), quiet = 4, total = n + quiet*2, dpr = window.devicePixelRatio || 1;
+    const cell = Math.max(2, Math.floor(cssSize*dpr/total));
+    canvas.width = canvas.height = cell*total;
+    canvas.style.width = canvas.style.height = (cell*total/dpr) + 'px';
+    const g = canvas.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, canvas.width, canvas.height); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect((c+quiet)*cell, (r+quiet)*cell, cell, cell);
+    return true;
+  } catch(e){ return false; }
+}
+$('qrCanvas').onclick = () => {
+  $('qrBigCode').textContent = 'Turbo Karts · code ' + net.code;
+  drawQR($('qrBigCanvas'), inviteUrl(), Math.min(innerWidth, innerHeight)*0.72);
+  $('qrBig').hidden = false;
+};
+$('qrBig').onclick = () => $('qrBig').hidden = true;
 async function shareInvite(){
   const url = inviteUrl(), text = '🏎️ Race je mee in Turbo Karts? Tik op de link, of typ code ' + net.code + ' bij Online → Meedoen.';
   if (navigator.share){
