@@ -140,12 +140,14 @@
   body.touch #tLeft{display:flex;gap:14px;position:absolute;left:18px;bottom:18px;pointer-events:auto}
   body.touch.tilt #tLeft{display:none}
   body.touch #tRight{display:grid;grid-template-columns:auto auto;gap:10px;align-items:end;justify-items:center;position:absolute;right:18px;bottom:18px;pointer-events:auto}
-  .tbtn{width:86px;height:86px;border-radius:50%;padding:0;font-size:32px;font-weight:900;font-style:normal;background:#ffffff2e;color:#fff;
+  #tLeft{touch-action:none;-webkit-user-select:none;user-select:none}
+  .tside{display:flex;align-items:center;justify-content:center}
+  .tbtn,.tside{width:86px;height:86px;border-radius:50%;padding:0;font-size:32px;font-weight:900;font-style:normal;background:#ffffff2e;color:#fff;
     border:3px solid #ffffffb0;box-shadow:0 4px 0 #0005;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   .tbtn.sm{width:64px;height:64px;font-size:15px}
   .tbtn.drift{font-size:12px;background:#40c4ff55}
   .tbtn.gas{width:102px;height:102px;font-size:21px;background:#69f0ae66}
-  .tbtn.on{background:#ffffffa0;color:#222;transform:scale(.93)}
+  .tbtn.on,.tside.on{background:#ffffffa0;color:#222;transform:scale(.93)}
   body.touch #speed{right:auto;left:50%;transform:translateX(-50%);bottom:12px;font-size:34px;text-align:center}
   /* telefoon rechtop: knoppen onderaan, snelheid erboven, knoppenbalk onder de stand */
   @media (orientation:portrait){
@@ -167,7 +169,7 @@
     body.touch #tbar{top:80px}
     #big{font-size:76px} #msg{font-size:22px;top:24%}
     #mm{right:10px;top:10px}
-    .tbtn{width:72px;height:72px;font-size:26px} .tbtn.sm{width:56px;height:56px;font-size:13px} .tbtn.gas{width:88px;height:88px;font-size:18px}
+    .tbtn,.tside{width:72px;height:72px;font-size:26px} .tbtn.sm{width:56px;height:56px;font-size:13px} .tbtn.gas{width:88px;height:88px;font-size:18px}
     h1{font-size:clamp(34px,8vw,60px)} .card{width:92px;padding:8px} .face{width:44px;height:44px;font-size:24px} .tcard{width:120px}
     .keys{font-size:12px} button{font-size:18px;padding:10px 24px}
   }
@@ -190,9 +192,9 @@
     <button id="tTilt" class="tb">📱 Kantelen: uit</button>
     <button id="tAuto" class="tb">⚡ Auto-gas: aan</button>
   </div>
-  <div id="tLeft">
-    <button class="tbtn" data-k="ArrowLeft" aria-label="Links sturen">◀</button>
-    <button class="tbtn" data-k="ArrowRight" aria-label="Rechts sturen">▶</button>
+  <div id="tLeft" role="group" aria-label="Sturen: houd je duim links of rechts, schuiven mag">
+    <div class="tside" data-s="-1" aria-label="Links sturen">◀</div>
+    <div class="tside" data-s="1" aria-label="Rechts sturen">▶</div>
   </div>
   <div id="tRight">
     <button class="tbtn sm" data-k="item" aria-label="Item gebruiken">🎁</button>
@@ -1289,51 +1291,78 @@ function numberTex(n){
     g.fillStyle = '#111'; g.font = '900 38px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(n, 32, 34); }));
 }
 
-// een menselijk poppetje: P bepaalt de houding. Geeft het hoofd terug (dat beweegt los).
+// een echte coureur: P bepaalt de houding. Geeft het hoofd terug (dat beweegt los).
+const harnessMat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.7 });
+const bootMat = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6 });
+const visorDark = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, metalness: 0.85, roughness: 0.08, transparent: true, opacity: 0.62, side: THREE.DoubleSide });
+const PATCH_COLS = [0xffd600, 0xffffff, 0x00b0ff, 0xff1744];
+// romp als afgerond blok langs de ruggengraat (van heup naar schouders)
+function torsoBlock(parent, mat, a, b, w, d, extras){
+  const A = new THREE.Vector3(a[0], a[1], 0), Bv = new THREE.Vector3(b[0], b[1], 0), dv = Bv.clone().sub(A), len = dv.length();
+  const g = new THREE.Group(); g.position.copy(A).add(Bv).multiplyScalar(0.5); g.quaternion.setFromUnitVectors(UPV, dv.normalize()); parent.add(g);
+  const m = new THREE.Mesh(rbox(d, len + 3, w, 3.2), mat); g.add(m);
+  if (extras) extras(g, len, d, w);
+  return g;
+}
 function makeDriver(parent, d, suit, P){
   const di = Math.max(0, DRIVERS.findIndex(x => x.name === d.name));
-  const skin = new THREE.MeshStandardMaterial({ color: SKINS[(di*5 + 1) % SKINS.length], roughness: 0.65 });
+  const skin = new THREE.MeshStandardMaterial({ color: SKINS[(di*5 + 1) % SKINS.length], roughness: 0.6 });
   const hairMat = new THREE.MeshStandardMaterial({ color: HAIR_COLS[(di*3 + 2) % HAIR_COLS.length], roughness: 0.75 });
-  const helmet = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.3, roughness: 0.22, side: THREE.DoubleSide });
+  const helmet = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.35, roughness: 0.18, side: THREE.DoubleSide });
+  const helmet2 = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).lerp(new THREE.Color(0xffffff), 0.75), metalness: 0.3, roughness: 0.2, side: THREE.DoubleSide });
+  const patchMat = new THREE.MeshStandardMaterial({ color: PATCH_COLS[di % PATCH_COLS.length], roughness: 0.6 });
   const put = (geo, mat, p, par = parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(p[0], p[1], p[2] || 0); par.add(m); return m; };
   const hip = [P.hip[0], P.hip[1], 0], sh = [P.sh[0], P.sh[1], 0];
-  // romp in racepak met een witte streep
-  put(sph(6, 16), suit, hip).scale.set(1, 0.8, 1.05);
-  limb3(parent, suit, 6, 5.4, hip, sh);
-  put(sph(5.6, 16), suit, [sh[0], sh[1] - 1, 0]).scale.set(0.95, 0.8, 1.15);
-  limb3(parent, stripeMat, 6.15, 6.0, lerp3(hip, sh, 0.42), lerp3(hip, sh, 0.52));
-  limb3(parent, skin, 2, 1.9, [sh[0], sh[1] + 1, 0], [P.head[0] - 0.6, P.head[1] - 4.2, 0]);   // nek
-  // hoofd (los, zodat het kan bewegen)
+
+  // --- romp: racepak met strepen, gordels en sponsorpatches ---
+  put(sph(5.6, 16), suit, hip).scale.set(1, 0.75, 1.15);                       // heupen
+  torsoBlock(parent, suit, hip, sh, 12.5, 9, (g, len, dd, w) => {
+    for (const s of [-1, 1]){
+      const strap = new THREE.Mesh(rbox(0.9, len + 1, 1.7, 0.35), harnessMat); strap.position.set(dd/2 + 0.2, 0.5, s*2.9); g.add(strap);          // schoudergordels
+      const stripe = new THREE.Mesh(rbox(dd - 1, len + 2, 0.7, 0.3), stripeMat); stripe.position.set(0, 0, s*(w/2 + 0.1)); g.add(stripe);        // witte zijstreep
+    }
+    const lap = new THREE.Mesh(rbox(1, 1.7, w - 1, 0.35), harnessMat); lap.position.set(dd/2 + 0.25, -len*0.38, 0); g.add(lap);                 // heupgordel
+    const buckle = new THREE.Mesh(rbox(1.2, 2.4, 2.4, 0.4), chrome); buckle.position.set(dd/2 + 0.5, -len*0.12, 0); g.add(buckle);            // gesp
+    const patch = new THREE.Mesh(rbox(0.6, 2.6, 3.6, 0.3), patchMat); patch.position.set(dd/2 + 0.3, len*0.22, -4.6); g.add(patch);           // sponsorpatch
+    const patch2 = new THREE.Mesh(rbox(0.6, 1.8, 3, 0.3), stripeMat); patch2.position.set(dd/2 + 0.3, len*0.28, 4.4); g.add(patch2);
+  });
+  // nekbeschermer (zoals bij echte coureurs) en nek
+  const hans = put(G('hans', () => new THREE.TorusGeometry(3.4, 1.3, 8, 20)), harnessMat, [sh[0], sh[1] + 1.2, 0]); hans.rotation.x = Math.PI/2;
+  limb3(parent, skin, 1.9, 1.8, [sh[0], sh[1] + 1, 0], [P.head[0] - 0.5, P.head[1] - 3.6, 0]);
+
+  // --- hoofd met dichte racehelm (los, zodat het kan bewegen) ---
   const head = new THREE.Group(); head.position.set(P.head[0], P.head[1], 0); parent.add(head);
-  put(sph(5.1, 22), skin, [0, 0, 0], head).scale.set(1, 1.08, 0.95);
+  put(sph(4.4, 18), skin, [0.3, -0.3, 0], head).scale.set(1, 1.05, 0.95);     // gezicht achter het vizier
   for (const s of [-1, 1]){
-    put(sph(1.05, 10), eyeWhite, [4.15, 0.9, s*1.85], head);                    // oogwit
-    put(sph(0.6, 8), eyeMat, [4.95, 0.9, s*1.85], head);                       // pupil
-    const brow = put(G('brow', () => new THREE.BoxGeometry(0.45, 0.45, 1.8)), hairMat, [4.75, 2.45, s*1.95], head); brow.rotation.x = s*0.18;
-    put(sph(1.15, 8), blushMat, [3.9, -0.9, s*3.0], head);                      // blosjes
+    put(sph(0.62, 8), eyeWhite, [3.95, 0.45, s*1.55], head);
+    put(sph(0.36, 8), eyeMat, [4.42, 0.45, s*1.55], head);
+    const brow = put(G('brow2', () => new THREE.BoxGeometry(0.35, 0.35, 1.5)), hairMat, [4.25, 1.45, s*1.6], head); brow.rotation.x = s*0.12;
   }
-  put(sph(0.95, 8), skin, [5.15, -0.4, 0], head);                               // neus
-  const smile = put(G('smile', () => new THREE.TorusGeometry(1.35, 0.3, 6, 14, Math.PI)), eyeMat, [4.75, -1.85, 0], head);
-  smile.rotation.set(0, Math.PI/2, Math.PI);                                     // lachende mond
-  // haar: pony, en per coureur een andere stijl
-  const style = HAIR_STYLES[di % HAIR_STYLES.length];
-  const fr = put(sph(3, 14), hairMat, [3.3, 3.55, 0], head); fr.scale.set(0.7, 0.42, 1.25); fr.rotation.z = -0.35;   // ronde pony
-  if (style === 'staart'){ put(sph(2.2, 10), hairMat, [-6.4, -0.8, 0], head); limb3(head, hairMat, 1.7, 1.1, [-6.8, -1.2, 0], [-9.2, -7.5, 0]); put(sph(1.2, 8), hairMat, [-9.3, -7.8, 0], head); }
-  if (style === 'krul') for (const [x, y, z] of [[-5.6, -3.4, 3.2], [-5.6, -3.4, -3.2], [-6.3, -1.8, 0], [-4.2, -4.6, 4.6], [-4.2, -4.6, -4.6], [-6.2, -4.2, 0]]) put(sph(1.7, 10), hairMat, [x, y, z], head);
-  if (style === 'kort') for (const s of [-1, 1]) put(G('burn', () => new THREE.BoxGeometry(1.4, 2.6, 0.8)), hairMat, [2.6, -1.5, s*4.75], head);
-  // open helm met vizier en streep
-  put(G('helm', () => new THREE.SphereGeometry(6.3, 26, 18, Math.PI + 0.95, Math.PI*2 - 1.9, 0, Math.PI*0.78)), helmet, [0, 0, 0], head);
-  put(G('visor', () => new THREE.SphereGeometry(6.6, 20, 8, Math.PI - 0.95, 1.9, 0.42, 0.62)), visorGlass, [0, 0, 0], head);
-  const stripe = put(G('hstripe', () => new THREE.TorusGeometry(6.38, 0.7, 6, 26, 1.95)), stripeMat, [0, 0, 0], head); stripe.rotation.z = 0.75;
+  // helm: bovenkant, zijkanten en kinstuk, met een opening voor het vizier
+  const R = 5.7;
+  put(G('helmTop', () => new THREE.SphereGeometry(R, 28, 10, 0, Math.PI*2, 0, 0.98)), helmet, [0, 0, 0], head);
+  put(G('helmSide', () => new THREE.SphereGeometry(R, 28, 6, Math.PI + 0.82, Math.PI*2 - 1.64, 0.98, 0.62)), helmet, [0, 0, 0], head);
+  put(G('helmChin', () => new THREE.SphereGeometry(R, 28, 8, 0, Math.PI*2, 1.6, 0.95)), helmet, [0, 0, 0], head);
+  put(G('helmVisor', () => new THREE.SphereGeometry(R + 0.12, 20, 6, Math.PI - 0.86, 1.72, 0.94, 0.7)), visorDark, [0, 0, 0], head);
+  // helmdesign: brede streep over het midden en een kleine spoiler achterop
+  const stripe = put(G('hstripe2', () => new THREE.TorusGeometry(R + 0.06, 1.1, 6, 30, 2.2)), helmet2, [0, 0, 0], head); stripe.rotation.z = 0.55;
+  const spoiler = put(rbox(3.2, 1, 6, 0.4), helmet2, [-4.4, 4.2, 0], head); spoiler.rotation.z = -0.5;
+  for (const s of [-1, 1]) put(sph(0.7, 8), chrome, [0.5, -0.6, s*(R - 0.1)], head);     // vizierscharnieren
+  // paardenstaart onder de helm uit (bij sommige coureurs)
+  if (HAIR_STYLES[di % HAIR_STYLES.length] === 'staart'){ limb3(head, hairMat, 1.5, 1.0, [-5.2, -2.6, 0], [-7.6, -8.6, 0]); put(sph(1.1, 8), hairMat, [-7.7, -8.9, 0], head); }
+
+  // --- armen, handschoenen, benen en raceschoenen ---
   for (const s of [-1, 1]){
-    const shp = [sh[0], sh[1], s*P.shW], el = [P.el[0], P.el[1], s*P.el[2]], ha = [P.hand[0], P.hand[1], s*P.hand[2]];
-    put(sph(3, 12), suit, shp);
-    limb3(parent, suit, 2.4, 2.1, shp, el); put(sph(2.1, 10), suit, el);
-    limb3(parent, suit, 2.0, 1.7, el, ha); put(sph(2.1, 10), gloveMat, ha);
+    const shp = [sh[0], sh[1] - 0.5, s*P.shW], el = [P.el[0], P.el[1], s*P.el[2]], ha = [P.hand[0], P.hand[1], s*P.hand[2]];
+    put(sph(2.7, 12), suit, shp).scale.set(1, 0.9, 1);
+    limb3(parent, suit, 2.1, 1.85, shp, el); put(sph(1.85, 10), suit, el);
+    limb3(parent, suit, 1.8, 1.5, el, ha);
+    limb3(parent, stripeMat, 1.95, 1.95, lerp3(el, ha, 0.72), lerp3(el, ha, 0.8));                    // witte boord bij de pols
+    put(sph(1.7, 10), gloveMat, ha).scale.set(1.25, 0.9, 1.05);                                      // handschoen
     const hp = [hip[0], hip[1], s*3.4], kn = [P.knee[0], P.knee[1], s*P.knee[2]], ft = [P.foot[0], P.foot[1], s*P.foot[2]];
-    limb3(parent, suit, 3.0, 2.6, hp, kn); put(sph(2.6, 10), suit, kn);
-    limb3(parent, suit, 2.4, 2.1, kn, ft);
-    put(sph(2.4, 10), gloveMat, ft).scale.set(1.6, 0.8, 1);
+    limb3(parent, suit, 2.7, 2.35, hp, kn); put(sph(2.35, 10), suit, kn);
+    limb3(parent, suit, 2.2, 1.9, kn, ft);
+    const boot = put(rbox(5.2, 2.6, 2.8, 1), bootMat, [ft[0] + 0.8, ft[1] - 0.2, ft[2]]); boot.rotation.z = -0.15;
   }
   return head;
 }
@@ -1965,7 +1994,7 @@ addEventListener('keydown', e => {
   if ((e.code === 'KeyE' || e.code === 'KeyX') && !e.repeat) itemPressed = true;
 });
 addEventListener('keyup', e => keys[e.code] = false);
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; document.querySelectorAll('.tbtn.on').forEach(b => b.classList.remove('on')); });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; touchSteer = 0; document.querySelectorAll('.tbtn.on').forEach(b => b.classList.remove('on')); });
 
 // ===== Aanraakbediening =====
 let autoGas = true, tiltOn = false, tiltSteer = 0;
@@ -1980,6 +2009,19 @@ addEventListener('pointerdown', e => {
     document.documentElement.requestFullscreen().then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {})).catch(() => {});
   }
 }, true);
+// stuurvlak: links of rechts van het midden bepaalt de richting, ook als je duim verschuift
+let touchSteer = 0, padId = null;
+const pad = $('tLeft');
+const padSet = e => { const r = pad.getBoundingClientRect(), sd = e.clientX < r.left + r.width/2 ? -1 : 1; touchSteer = sd;
+  pad.querySelectorAll('.tside').forEach(el => el.classList.toggle('on', +el.dataset.s === sd)); };
+const padEnd = e => { if (e.pointerId !== padId) return; padId = null; touchSteer = 0; pad.querySelectorAll('.tside').forEach(el => el.classList.remove('on')); };
+pad.addEventListener('pointerdown', e => { e.preventDefault(); padId = e.pointerId; try { pad.setPointerCapture(e.pointerId); } catch(_){} padSet(e); });
+pad.addEventListener('pointermove', e => { if (e.pointerId === padId) padSet(e); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => pad.addEventListener(ev, padEnd));
+pad.addEventListener('contextmenu', e => e.preventDefault());
+// iPhone: niet inzoomen of de pagina laten verschuiven als je met twee duimen speelt
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchmove', e => { if (document.body.classList.contains('racing')) e.preventDefault(); }, { passive: false });
 document.querySelectorAll('.tbtn').forEach(b => {
   const k = b.dataset.k;
   const down = e => { e.preventDefault(); b.classList.add('on'); if (k === 'item') itemPressed = true; else keys[k] = true; try { b.setPointerCapture(e.pointerId); } catch(_){} };
@@ -2015,7 +2057,7 @@ function playerInput(){
   const braking = keys.ArrowDown || keys.KeyS;
   const steerKeys = ((keys.ArrowRight || keys.KeyD) ? 1 : 0) - ((keys.ArrowLeft || keys.KeyA) ? 1 : 0);
   return { up: keys.ArrowUp || keys.KeyW || (autoGas && usingTouch() && !braking && state !== 'countdown'), down: braking, drift: keys.Space || keys.ShiftLeft || keys.ShiftRight,
-    steer: steerKeys || (tiltOn ? tiltSteer : 0) };
+    steer: steerKeys || touchSteer || (tiltOn ? tiltSteer : 0) };
 }
 function aiInput(c, t){
   const look = 10 + Math.floor(Math.abs(c.vf)/45), i = c.idx + look, p = P(i), d = dir(i);
