@@ -550,9 +550,45 @@ function buildTrack(k){
     g.fillStyle = gc[0]; g.globalAlpha = .55; g.fillRect(0,0,w,h);
     const r = rng(7); for (let i = 0; i < 9000; i++){ g.fillStyle = gc[1 + Math.floor(r()*3)]; g.globalAlpha = .5; g.fillRect(r()*w, r()*h, 2, 2+r()*3); }
     g.globalAlpha = 1; });
-  groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(55, 55);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshLambertMaterial({ map: groundTex }));
+  // vlakke grond met textuur rond de baan
+  const GS = Math.max(B.x1-B.x0, B.y1-B.y0) + 5200;
+  groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(GS/545, GS/545);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(GS, GS), new THREE.MeshLambertMaterial({ map: groundTex }));
   ground.rotation.x = -Math.PI/2; ground.position.set(CX, 0, CZ); ground.receiveShadow = true; addW(ground);
+
+  // glooiend landschap met bergen in de verte (vervangt de puntige kegels)
+  {
+    const hash = (x, y) => { const s = Math.sin(x*127.1 + y*311.7 + k*17.3)*43758.5453; return s - Math.floor(s); };
+    const vnoise = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x-xi, yf = y-yi, u = xf*xf*(3-2*xf), v = yf*yf*(3-2*yf);
+      const a = hash(xi, yi), b = hash(xi+1, yi), c = hash(xi, yi+1), d = hash(xi+1, yi+1); return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v; };
+    const fbm = (x, y) => { let s = 0, a = 0.5, f = 1; for (let o = 0; o < 5; o++){ s += a*vnoise(x*f, y*f); f *= 2.03; a *= 0.5; } return s; };
+    const smooth = (a, b, x) => { const t = clamp((x-a)/(b-a), 0, 1); return t*t*(3-2*t); };
+    const MT = { beach: 1000, snow: 2300, night: 900, lava: 1500, desert: 420, city: 0 }[TR.theme] ?? 1000;
+    const TS = 30000, SEG = IS_TOUCH ? 110 : 160;
+    const tg = new THREE.PlaneGeometry(TS, TS, SEG, SEG); tg.rotateX(-Math.PI/2);
+    const pos = tg.attributes.position, col = new Float32Array(pos.count*3);
+    const sample = PTS.filter((_, i) => i % 4 === 0);
+    const cBase = new THREE.Color(TH.ground[0]), cDark = new THREE.Color(TH.ground[3]);
+    const cRock = new THREE.Color(({ desert: 0xa65a2a, lava: 0x2a201d, night: 0x2b3040, snow: 0x8a8f96, beach: 0x6f7a62 })[TR.theme] || 0x777a72);
+    const cSnow = new THREE.Color(0xf4f7fb), c = new THREE.Color();
+    const snowy = TR.theme === 'snow' || TR.theme === 'beach';
+    for (let v = 0; v < pos.count; v++){
+      const x = pos.getX(v) + CX, z = pos.getZ(v) + CZ;
+      let dmin = 1e18; for (const p of sample){ const dd = (p.x-x)**2 + (p.y-z)**2; if (dd < dmin) dmin = dd; }
+      const dist = Math.sqrt(dmin);
+      const far = smooth(WALL + 1400, WALL + 4600, dist);
+      const n = fbm(x*0.00042, z*0.00042), ridge = 1 - Math.abs(fbm(x*0.0009 + 3, z*0.0009 + 9)*2 - 1);
+      let h = -2 + far*MT*(0.35*n + 0.85*ridge*ridge) + smooth(WALL + 800, WALL + 1800, dist)*55*fbm(x*0.003 + 7, z*0.003);
+      if (TR.theme === 'beach' && z > maxY + 250) h = Math.min(h, -30);          // de zee blijft vlak
+      pos.setY(v, h);
+      c.copy(cBase).lerp(cDark, fbm(x*0.002, z*0.002)*0.8);                      // vlekken in het gras/zand
+      if (MT > 0){ c.lerp(cRock, smooth(MT*0.18, MT*0.45, h)); if (snowy) c.lerp(cSnow, smooth(MT*0.55, MT*0.7, h)); }
+      col[v*3] = c.r; col[v*3+1] = c.g; col[v*3+2] = c.b;
+    }
+    tg.setAttribute('color', new THREE.BufferAttribute(col, 3)); tg.computeVertexNormals();
+    const terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    terrain.position.set(CX, 0, CZ); terrain.receiveShadow = true; addW(terrain);
+  }
 
   // --- weg, curbs, muren ---
   const roadMat = new THREE.MeshStandardMaterial({ map: asphaltTex, vertexColors: true, roughness: 0.92, side: THREE.DoubleSide });
@@ -812,14 +848,14 @@ function buildTrack(k){
   const R = rng(42 + k);
   const kit = {
     trunk: new THREE.MeshLambertMaterial({ color: 0x6d4c41 }),
-    leaf: [0x2e7d32, 0x33691e, 0x1b5e20].map(c => new THREE.MeshLambertMaterial({ color: c, flatShading: true })),
+    leaf: [0x2e7d32, 0x33691e, 0x1b5e20, 0x388e3c, 0x2f6b2a, 0x40752f].map(c => new THREE.MeshLambertMaterial({ color: c })),
     palm: new THREE.MeshLambertMaterial({ color: 0x43a047, side: THREE.DoubleSide }),
-    snow: new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }),
+    snow: new THREE.MeshLambertMaterial({ color: 0xffffff }),
     dead: new THREE.MeshLambertMaterial({ color: 0x3e3530 }),
-    rock: new THREE.MeshStandardMaterial({ color: TR.theme === 'desert' ? 0xa65e2e : 0x2f2826, roughness: 1, flatShading: true }),
-    cactus: new THREE.MeshLambertMaterial({ color: 0x558b2f, flatShading: true }),
+    rock: new THREE.MeshStandardMaterial({ color: TR.theme === 'desert' ? 0xa65e2e : 0x2f2826, roughness: 0.95 }),
+    cactus: new THREE.MeshLambertMaterial({ color: 0x558b2f }),
   };
-  const cone = new THREE.ConeGeometry(1, 1.6, 8);
+  const cone = new THREE.ConeGeometry(1, 1.6, 14);
   function makeTree(type){
     const t = new THREE.Group(), s = 0.8 + R()*0.5;
     if (type === 'palm'){
@@ -827,13 +863,13 @@ function buildTrack(k){
       for (let q = 0; q < 7; q++){ const lg = new THREE.Group(); lg.position.set(x+4, 74, 0); lg.rotation.y = q/7*Math.PI*2;
         const leaf = new THREE.Mesh(new THREE.BoxGeometry(46, 1.2, 10), kit.palm); leaf.position.x = 20; leaf.rotation.z = -0.38; lg.add(leaf); t.add(lg); }
     } else if (type === 'pine' || type === 'snowpine'){
-      const tr = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 5.5, 26, 7), kit.trunk); tr.position.y = 13; t.add(tr);
-      const sz = 24, lm = kit.leaf[Math.floor(R()*3)];
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 5.5, 26, 10), kit.trunk); tr.position.y = 13; t.add(tr);
+      const sz = 24, lm = kit.leaf[Math.floor(R()*kit.leaf.length)];
       for (let q = 0; q < 3; q++){ const l = new THREE.Mesh(cone, type === 'snowpine' && q === 2 ? kit.snow : lm), sc = sz*(1.25 - q*0.3);
         l.scale.set(sc, sc, sc); l.position.y = 24 + sz*0.55 + q*sz*0.62; t.add(l);
         if (type === 'snowpine' && q < 2){ const cap = new THREE.Mesh(cone, kit.snow); cap.scale.set(sc*0.55, sc*0.35, sc*0.55); cap.position.y = l.position.y + sc*0.55; t.add(cap); } }
     } else if (type === 'cactus'){
-      const cm = kit.cactus, tr = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 60, 8), cm); tr.position.y = 30; t.add(tr);
+      const cm = kit.cactus, tr = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 60, 14), cm); tr.position.y = 30; t.add(tr);
       const top = new THREE.Mesh(new THREE.SphereGeometry(6, 8, 6), cm); top.position.y = 60; t.add(top);
       for (const sd of [-1, 1]) if (R() < 0.8){ const h = 22 + R()*14;
         const arm = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 12, 7), cm); arm.rotation.z = Math.PI/2; arm.position.set(sd*10, h, 0); t.add(arm);
@@ -844,24 +880,25 @@ function buildTrack(k){
       for (let q = 0; q < 4; q++){ const b = new THREE.Mesh(new THREE.CylinderGeometry(1, 2, 32, 5), kit.dead); b.position.set(0, 35 + q*9, 0);
         b.rotation.set(0, R()*6, (q%2 ? 1 : -1)*(0.7 + R()*0.4)); b.translateY(14); t.add(b); }
     } else {
-      const r = new THREE.Mesh(new THREE.DodecahedronGeometry(14 + R()*26, 0), kit.rock); r.scale.y = 0.7; r.position.y = 8; r.rotation.set(R()*3, R()*3, 0); t.add(r);
+      const r = new THREE.Mesh(new THREE.DodecahedronGeometry(14 + R()*26, 1), kit.rock); r.scale.y = 0.7; r.position.y = 8; r.rotation.set(R()*3, R()*3, 0); t.add(r);
     }
     t.scale.setScalar(s); t.rotation.y = R()*6; return t;
   }
-  let tries = 0;
+  let tries = 0; const forest = new THREE.Group(); addW(forest);
   for (let n = 0; n < 160 && tries < 7000 && TH.trees !== 'none'; tries++){
     const x = B.x0 - 500 + R()*(B.x1-B.x0+1000), y = B.y0 - 500 + R()*(B.y1-B.y0+1000);
     if (!roadClear(x, y, 20) || Math.hypot(x-STAND.x, y-STAND.z) < 420) continue;
     if (TR.theme === 'beach' && y > maxY + 260) continue;
     if (PIT && Math.hypot(x-PIT.x, y-PIT.z) < 300) continue;
     if (noTree.some(o => Math.hypot(x-o.x, y-o.z) < 260)) continue;
-    const t = makeTree(TR.theme === 'desert' && R() < 0.3 ? 'rock' : TH.trees); t.position.set(x, 0, y); shadows(t, true, false); addW(t); n++;
+    const t = makeTree(TR.theme === 'desert' && R() < 0.3 ? 'rock' : TH.trees); t.position.set(x, 0, y); forest.add(t); n++;
   }
+  bakeStatic(forest); shadows(forest, true, false);   // alle bomen samen: veel sneller te tekenen
   // bergen in de verte
   const mountMat = new THREE.MeshLambertMaterial({ color: TH.mount, flatShading: true }), capMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
   const ringR = Math.max(maxX-minX, maxY-minY)/2 + 4500;
   for (let i = 0; i < 28; i++){
-    const a = i/28*Math.PI*2; if (TR.theme === 'beach' && Math.sin(a) > 0.1) continue; if (TR.theme === 'city') continue;
+    const a = i/28*Math.PI*2; if (TR.theme !== 'desert') continue;   // het landschap heeft nu echte bergen; alleen de woestijn houdt tafelbergen
     const r = ringR + R()*1200, h = 1000 + R()*1400 + (TH.snowcap ? 600 : 0), w = 900 + R()*700;
     const mesa = TR.theme === 'desert', m = new THREE.Mesh(mesa ? new THREE.CylinderGeometry(w*0.55, w*0.8, h*0.45, 7) : new THREE.ConeGeometry(w, h, 7), mountMat);
     m.position.set(CX + Math.cos(a)*r, mesa ? h*0.225 : h/2, CZ + Math.sin(a)*r); addW(m);
@@ -1100,99 +1137,181 @@ function addSkid(x1, y1, z1, x2, y2, z2){
 }
 function clearSkids(){ skidN = 0; skidCount = 0; skidGeo.setDrawRange(0, 0); }
 
+// ===== Vaste onderdelen samenvoegen tot een paar grote stukken (veel minder werk voor de grafische kaart) =====
+function bakeStatic(group, keep = new Set()){
+  group.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(group.matrixWorld).invert(), byMat = new Map(), done = [];
+  group.traverse(o => {
+    if (!o.isMesh || Array.isArray(o.material) || o.isInstancedMesh) return;
+    for (let p = o; p && p !== group; p = p.parent) if (keep.has(p)) return;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    if (!byMat.has(o.material)) byMat.set(o.material, []);
+    byMat.get(o.material).push(g); done.push(o);
+  });
+  done.forEach(o => o.parent.remove(o));
+  for (const [mat, list] of byMat){
+    const total = list.reduce((n, g) => n + g.attributes.position.count, 0), pos = new Float32Array(total*3), nor = new Float32Array(total*3);
+    let off = 0;
+    for (const g of list){ pos.set(g.attributes.position.array, off*3); if (g.attributes.normal) nor.set(g.attributes.normal.array, off*3); off += g.attributes.position.count; g.dispose(); }
+    const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); mg.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    mg.userData.own = true;
+    const mesh = new THREE.Mesh(mg, mat); group.add(mesh);
+  }
+}
+
 // ================= Karts =================
-const tireGeo = new THREE.CylinderGeometry(7.5, 7.5, 8, 16), tireMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95 });
-const rimGeo = new THREE.CylinderGeometry(4.2, 4.2, 8.6, 10), rimMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, metalness: 0.8, roughness: 0.3 });
-const carbon = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.6, metalness: 0.3 });
+// Gedeelde vormen worden één keer gemaakt en door alle karts hergebruikt (scheelt rekenkracht).
+const geoCache = {};
+const G = (key, make) => geoCache[key] || (geoCache[key] = make());
+// blok met afgeronde randen
+function rbox(w, h, d, r){
+  return G('rb' + [w, h, d, r], () => {
+    r = Math.min(r, w/2 - 0.05, h/2 - 0.05, d/2 - 0.05);
+    const iw = w - 2*r, ih = h - 2*r, cr = Math.min(iw, ih)*0.2, x0 = -iw/2, y0 = -ih/2, s = new THREE.Shape();
+    s.moveTo(x0 + cr, y0); s.lineTo(x0 + iw - cr, y0); s.quadraticCurveTo(x0 + iw, y0, x0 + iw, y0 + cr);
+    s.lineTo(x0 + iw, y0 + ih - cr); s.quadraticCurveTo(x0 + iw, y0 + ih, x0 + iw - cr, y0 + ih);
+    s.lineTo(x0 + cr, y0 + ih); s.quadraticCurveTo(x0, y0 + ih, x0, y0 + ih - cr);
+    s.lineTo(x0, y0 + cr); s.quadraticCurveTo(x0, y0, x0 + cr, y0);
+    const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.05, d - 2*r), bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 3, curveSegments: 4 });
+    g.translate(0, 0, -Math.max(0.05, d - 2*r)/2); g.computeVertexNormals(); return g;
+  });
+}
+const sph = (r, seg = 16) => G('sph' + r + '_' + seg, () => new THREE.SphereGeometry(r, seg, Math.max(8, seg*0.75 | 0)));
+// band met een rond profiel (as langs y; wordt gedraaid zodat hij rolt)
+function tireGeom(R, W){
+  return G('tire' + R + '_' + W, () => new THREE.LatheGeometry(
+    [[R*0.58, -W/2], [R*0.86, -W/2], [R*0.97, -W*0.38], [R, 0], [R*0.97, W*0.38], [R*0.86, W/2], [R*0.58, W/2]].map(([x, y]) => new THREE.Vector2(x, y)), 28));
+}
+const tireMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.92, side: THREE.DoubleSide });
+const rimMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, metalness: 0.8, roughness: 0.3 });
+const carbon = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.55, metalness: 0.3 });
 const chrome = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.2 });
 const visorMat = new THREE.MeshStandardMaterial({ color: 0x101820, metalness: 0.5, roughness: 0.1 });
+const visorGlass = new THREE.MeshStandardMaterial({ color: 0x223344, metalness: 0.6, roughness: 0.05, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
 const headMat = new THREE.MeshBasicMaterial({ color: 0xfffde7 });
-const bikeTireGeo = new THREE.CylinderGeometry(9.5, 9.5, 5, 18), bikeRimGeo = new THREE.CylinderGeometry(5.5, 5.5, 5.6, 12);
-// staaf tussen twee punten (voor armen, benen en de voorvork)
-function limb(parent, mat, r, a, b){
-  const dx = b[0]-a[0], dy = b[1]-a[1], len = Math.hypot(dx, dy);
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r*0.9, len, 8), mat);
-  m.position.set((a[0]+b[0])/2, (a[1]+b[1])/2, a[2]); m.rotation.z = Math.atan2(dy, dx) - Math.PI/2; parent.add(m); return m;
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.3 });
+const gloveMat = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.8 });
+const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
+const SKINS = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xd9a07b];
+const UPV = new THREE.Vector3(0, 1, 0);
+// staaf tussen twee punten in 3D (armen, benen, romp)
+function limb3(parent, mat, r1, r2, a, b){
+  const A = new THREE.Vector3(a[0], a[1], a[2] || 0), Bv = new THREE.Vector3(b[0], b[1], b[2] || 0), dv = Bv.clone().sub(A), len = dv.length();
+  const m = new THREE.Mesh(G('cyl' + r1 + '_' + r2 + '_' + len.toFixed(1), () => new THREE.CylinderGeometry(r2, r1, len, 14)), mat);
+  m.position.copy(A).add(Bv).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(UPV, dv.normalize()); parent.add(m); return m;
 }
+// staaf in het zijvlak (voor de voorvork en achterbrug van de motor)
+function limb(parent, mat, r, a, b){ return limb3(parent, mat, r, r*0.9, a, b); }
+const lerp3 = (a, b, t) => [a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, (a[2] || 0) + ((b[2] || 0) - (a[2] || 0))*t];
+
+// een menselijk poppetje: P bepaalt de houding (zittend in een kart of voorovergebogen op een motor)
+function makeDriver(parent, d, suit, P){
+  const skinI = [...d.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % SKINS.length;
+  const skin = new THREE.MeshStandardMaterial({ color: SKINS[skinI], roughness: 0.65 });
+  const helmet = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.3, roughness: 0.25, side: THREE.DoubleSide });
+  const put = (geo, mat, p) => { const m = new THREE.Mesh(geo, mat); m.position.set(p[0], p[1], p[2] || 0); parent.add(m); return m; };
+  const hip = [P.hip[0], P.hip[1], 0], sh = [P.sh[0], P.sh[1], 0];
+  // romp in racepak, met een witte streep
+  put(sph(6, 16), suit, hip).scale.set(1, 0.8, 1.05);
+  limb3(parent, suit, 6, 5.4, hip, sh);
+  put(sph(5.6, 16), suit, [sh[0], sh[1] - 1, 0]).scale.set(0.95, 0.8, 1.15);
+  limb3(parent, stripeMat, 6.15, 6.0, lerp3(hip, sh, 0.42), lerp3(hip, sh, 0.52));
+  // nek en hoofd met gezicht
+  limb3(parent, skin, 2, 1.9, [sh[0], sh[1] + 1, 0], [P.head[0] - 0.6, P.head[1] - 4.2, 0]);
+  put(sph(5.1, 22), skin, P.head).scale.set(1, 1.08, 0.95);
+  for (const s of [-1, 1]){ put(sph(0.75, 8), eyeMat, [P.head[0] + 4.5, P.head[1] + 0.9, s*1.8]); }
+  put(sph(0.9, 8), skin, [P.head[0] + 5.1, P.head[1] - 0.5, 0]);                                         // neus
+  put(G('mouth', () => new THREE.BoxGeometry(0.5, 0.45, 2.2)), eyeMat, [P.head[0] + 4.7, P.head[1] - 2.3, 0]);   // mond
+  // open helm met vizier
+  put(G('helm', () => new THREE.SphereGeometry(6.3, 26, 18, Math.PI + 0.95, Math.PI*2 - 1.9, 0, Math.PI*0.78)), helmet, P.head);
+  put(G('visor', () => new THREE.SphereGeometry(6.6, 20, 8, Math.PI - 0.95, 1.9, 0.42, 0.62)), visorGlass, P.head);
+  for (const s of [-1, 1]){
+    // armen met elleboog en handschoen
+    const shp = [sh[0], sh[1], s*P.shW], el = [P.el[0], P.el[1], s*P.el[2]], ha = [P.hand[0], P.hand[1], s*P.hand[2]];
+    put(sph(3, 12), suit, shp);
+    limb3(parent, suit, 2.4, 2.1, shp, el); put(sph(2.1, 10), suit, el);
+    limb3(parent, suit, 2.0, 1.7, el, ha); put(sph(2.1, 10), gloveMat, ha);
+    // benen met knie en schoen
+    const hp = [hip[0], hip[1], s*3.4], kn = [P.knee[0], P.knee[1], s*P.knee[2]], ft = [P.foot[0], P.foot[1], s*P.foot[2]];
+    limb3(parent, suit, 3.0, 2.6, hp, kn); put(sph(2.6, 10), suit, kn);
+    limb3(parent, suit, 2.4, 2.1, kn, ft);
+    put(sph(2.4, 10), gloveMat, ft).scale.set(1.6, 0.8, 1);
+  }
+}
+const KART_POSE = { hip: [-6, 12.5], sh: [-4.5, 25], head: [-3, 32], shW: 6, el: [2.5, 18.5, 8.5], hand: [10.2, 21, 4.6], knee: [7, 15.5, 5.5], foot: [16, 9.5, 5] };
+const BIKE_POSE = { hip: [-7, 25], sh: [4, 33.5], head: [9.5, 38.5], shW: 6, el: [9, 27.5, 8.5], hand: [13.5, 28.5, 9.5], knee: [4, 19, 7.5], foot: [-2, 10.5, 7.5] };
+
 function makeBikeMesh(d){
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body); root.rotation.order = 'YXZ';
-  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.4, roughness: 0.3 });
-  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).multiplyScalar(0.7), roughness: 0.8 });
+  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.4, roughness: 0.28 });
+  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).lerp(new THREE.Color(0x1e2430), 0.5), roughness: 0.8 });   // donkerder pak, zodat de helm opvalt
   const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
   const wheels = [], fronts = [];
   for (const x of [21, -19]){
     const pivot = new THREE.Group(); pivot.position.set(x, 9.5, 0); body.add(pivot);
     const spin = new THREE.Group(); pivot.add(spin);
-    const t = new THREE.Mesh(bikeTireGeo, tireMat); t.rotation.x = Math.PI/2; spin.add(t);
-    const r = new THREE.Mesh(bikeRimGeo, rimMat); r.rotation.x = Math.PI/2; spin.add(r);
+    const t = new THREE.Mesh(tireGeom(9.5, 5), tireMat); t.rotation.x = Math.PI/2; spin.add(t);
+    const r = new THREE.Mesh(G('bikerim', () => new THREE.CylinderGeometry(5.6, 5.6, 5.2, 20)), rimMat); r.rotation.x = Math.PI/2; spin.add(r);
+    const hub = new THREE.Mesh(G('bikehub', () => new THREE.CylinderGeometry(1.8, 1.8, 6.2, 12)), carbon); hub.rotation.x = Math.PI/2; spin.add(hub);
     wheels.push(spin);
     if (x > 0){ fronts.push(pivot); limb(pivot, chrome, 1.4, [0, 0, 3.5], [-6, 16, 3.5]); limb(pivot, chrome, 1.4, [0, 0, -3.5], [-6, 16, -3.5]); }
   }
-  limb(body, carbon, 3, [-19, 9.5, 0], [-2, 13, 0]);                 // achterbrug
-  add(new THREE.BoxGeometry(26, 7, 7), carbon, 2, 15, 0);              // frame
-  add(new THREE.BoxGeometry(14, 6, 9), carbon, 0, 10, 0);              // motorblok
-  add(new THREE.BoxGeometry(16, 9, 13), paint, 6, 21, 0);              // tank
-  const fairing = add(new THREE.BoxGeometry(11, 15, 13), paint, 16, 21, 0); fairing.rotation.z = -0.4;   // voorkuip
-  add(new THREE.BoxGeometry(5, 6, 10), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, metalness: .3, roughness: .1, transparent: true, opacity: .7 }), 20, 29, 0);  // windscherm
-  add(new THREE.BoxGeometry(2, 3, 5), headMat, 22.5, 19, 0);           // koplamp
-  add(new THREE.BoxGeometry(14, 4, 10), carbon, -6, 22, 0);            // zadel
-  const tail = add(new THREE.BoxGeometry(12, 6, 9), paint, -16, 22, 0); tail.rotation.z = 0.25;
-  const ex = add(new THREE.CylinderGeometry(2, 2.4, 16, 8), chrome, -14, 12, 6); ex.rotation.z = Math.PI/2 - 0.2;   // uitlaat
-  add(new THREE.BoxGeometry(3, 2, 22), carbon, 13, 28, 0);             // stuur
-  // rijder, voorovergebogen
-  const torso = limb(body, suit, 6, [-5, 25, 0], [5, 34, 0]); torso.scale.set(1, 1, 1.15);
-  add(new THREE.SphereGeometry(8, 16, 12), paint, 9, 38, 0);
-  add(new THREE.BoxGeometry(5, 5, 10), visorMat, 15.5, 38.5, 0);
-  add(new THREE.BoxGeometry(16, 1.4, 16.4), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .5 }), 9, 42.5, 0);
-  for (const s of [-1, 1]){
-    limb(body, suit, 2.1, [4, 33, s*6.5], [13, 28.5, s*9]);             // arm
-    limb(body, suit, 2.8, [-5, 25, s*6], [5, 18, s*8]);                  // bovenbeen
-    limb(body, suit, 2.3, [5, 18, s*8], [-1, 9, s*8]);                   // onderbeen
-  }
-  const flame = add(new THREE.ConeGeometry(3.5, 20, 10), new THREE.MeshBasicMaterial({ color: 0xff9100 }), -28, 12, 6); flame.rotation.z = Math.PI/2;
+  limb(body, carbon, 3, [-19, 9.5, 0], [-2, 13, 0]);                           // achterbrug
+  add(rbox(26, 7, 7, 2.5), carbon, 2, 15, 0);                                    // frame
+  add(rbox(14, 8, 10, 2.5), carbon, 0, 10.5, 0);                                 // motorblok
+  add(rbox(16, 9, 13, 4), paint, 6, 21, 0);                                      // tank
+  const fairing = add(rbox(11, 16, 13, 4), paint, 16, 21, 0); fairing.rotation.z = -0.4;   // voorkuip
+  add(rbox(5, 7, 10, 1.5), new THREE.MeshStandardMaterial({ color: 0x9fd3ff, metalness: .3, roughness: .1, transparent: true, opacity: .7 }), 20, 29.5, 0);  // windscherm
+  add(rbox(2, 3, 5, 0.8), headMat, 22.8, 19, 0);                                 // koplamp
+  add(rbox(14, 4, 10, 1.8), carbon, -6, 22.5, 0);                                // zadel
+  const tail = add(rbox(12, 6, 9, 2.5), paint, -16, 22, 0); tail.rotation.z = 0.25;
+  const ex = add(G('bikeexh', () => new THREE.CylinderGeometry(2, 2.4, 16, 14)), chrome, -14, 12, 6); ex.rotation.z = Math.PI/2 - 0.2;   // uitlaat
+  add(rbox(3, 2, 22, 0.9), carbon, 13, 28, 0);                                   // stuur
+  makeDriver(body, d, suit, BIKE_POSE);
+  const flame = add(new THREE.ConeGeometry(3.5, 20, 12), new THREE.MeshBasicMaterial({ color: 0xff9100 }), -28, 12, 6); flame.rotation.z = Math.PI/2;
   const sparkMat = new THREE.MeshBasicMaterial({ color: 0x40c4ff });
-  const sparks = [add(new THREE.SphereGeometry(3.5, 8, 6), sparkMat, -19, 2, 5), add(new THREE.SphereGeometry(3.5, 8, 6), sparkMat, -19, 2, -5)];
+  const sparks = [add(sph(3.5, 8), sparkMat, -19, 2, 5), add(sph(3.5, 8), sparkMat, -19, 2, -5)];
+  bakeStatic(body, new Set([...fronts, ...wheels.map(w => w.parent), flame, ...sparks]));
   shadows(body, true, false); flame.castShadow = false; sparks.forEach(s => s.castShadow = false);
-  const shield = new THREE.Mesh(new THREE.SphereGeometry(36, 18, 12), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
+  const shield = new THREE.Mesh(sph(36, 18), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
   shield.position.y = 20; root.add(shield);
   scene.add(root);
   return { root, body, flame, sparks, sparkMat, shield, wheels, fronts, bike: true };
 }
 function makeKartMesh(d){
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body); root.rotation.order = 'YXZ';
-  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.35, roughness: 0.35 });
-  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).multiplyScalar(0.7), roughness: 0.8 });
+  const paint = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.35, roughness: 0.3 });
+  const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).lerp(new THREE.Color(0x1e2430), 0.5), roughness: 0.8 });   // donkerder pak, zodat de helm opvalt
   const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
-  add(new THREE.BoxGeometry(46, 3, 22), carbon, 0, 5.5, 0);
-  add(new THREE.BoxGeometry(20, 7, 8), paint, 2, 9, 14);
-  add(new THREE.BoxGeometry(20, 7, 8), paint, 2, 9, -14);
-  const nose = add(new THREE.BoxGeometry(16, 6, 22), paint, 24, 8, 0); nose.rotation.z = -0.18;
-  add(new THREE.BoxGeometry(6, 3, 34), carbon, 31, 5, 0);
-  for (const z of [-7, 7]) add(new THREE.BoxGeometry(2, 3, 5), headMat, 32.5, 8, z);   // koplampjes
-  add(new THREE.BoxGeometry(5, 3, 34), carbon, -27, 6, 0);
-  add(new THREE.BoxGeometry(12, 9, 14), carbon, -18, 11, 0);
-  for (const z of [-4, 4]){ const ex = add(new THREE.CylinderGeometry(1.6, 1.6, 10, 8), chrome, -25, 14, z); ex.rotation.z = Math.PI/2; }
-  add(new THREE.BoxGeometry(12, 3, 14), carbon, -4, 9, 0);
-  add(new THREE.BoxGeometry(3, 12, 14), carbon, -10, 15, 0);
-  const torso = add(new THREE.CylinderGeometry(6, 7.5, 15, 10), suit, -4, 19, 0); torso.rotation.z = -0.15;
-  add(new THREE.SphereGeometry(8.5, 16, 12), paint, -2, 32, 0);
-  add(new THREE.BoxGeometry(4, 5, 11), visorMat, 5.5, 32.5, 0);
-  add(new THREE.BoxGeometry(17, 1.5, 17.4), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .5 }), -2, 36.8, 0);
-  for (const z of [-6, 6]){ const arm = add(new THREE.CylinderGeometry(2.2, 2.2, 15, 8), suit, 4, 21, z); arm.rotation.z = Math.PI/2 - 0.5; }
-  const wheel = add(new THREE.TorusGeometry(4.5, 1.1, 6, 14), carbon, 11, 19, 0); wheel.rotation.y = Math.PI/2; wheel.rotation.x = 0.4;
+  add(rbox(46, 3, 24, 1.2), carbon, 0, 5.5, 0);                                  // vloerplaat
+  for (const s of [-1, 1]) add(rbox(22, 7, 9, 3), paint, 2, 9, s*14.5);          // zijbakken
+  const nose = add(rbox(18, 6.5, 22, 3), paint, 24, 8.5, 0); nose.rotation.z = -0.18;
+  add(rbox(7, 3, 36, 1.4), carbon, 31.5, 5.5, 0);                                // voorbumper
+  for (const z of [-7, 7]) add(rbox(2, 3, 5, 0.8), headMat, 33.2, 8.5, z);       // koplampjes
+  add(rbox(5, 3, 36, 1.4), carbon, -27.5, 6.5, 0);                               // achterbumper
+  add(rbox(12, 9, 14, 2.5), carbon, -18, 11, 0);                                 // motor
+  for (const z of [-4, 4]){ const ex = add(G('exh', () => new THREE.CylinderGeometry(1.6, 1.8, 11, 14)), chrome, -25.5, 14, z); ex.rotation.z = Math.PI/2; }
+  add(rbox(13, 3, 15, 1.3), carbon, -6, 9.5, 0);                                 // stoel
+  const back = add(rbox(3, 13, 15, 1.3), carbon, -12, 16, 0); back.rotation.z = 0.12;   // rugleuning
+  const column = add(G('column', () => new THREE.CylinderGeometry(0.9, 0.9, 12, 10)), carbon, 14, 15.5, 0); column.rotation.z = 1.05;
+  const wheel = add(G('swheel', () => new THREE.TorusGeometry(4.6, 0.9, 10, 28)), carbon, 10.5, 20.5, 0); wheel.rotation.y = Math.PI/2; wheel.rotation.x = 0.4;
+  makeDriver(body, d, suit, KART_POSE);
   const wheels = [], fronts = [];
   for (const [x, z] of [[17,15],[17,-15],[-16,16],[-16,-16]]){
     const pivot = new THREE.Group(); pivot.position.set(x, 7.5, z); body.add(pivot);
     const spin = new THREE.Group(); pivot.add(spin);
-    const t = new THREE.Mesh(tireGeo, tireMat); t.rotation.x = Math.PI/2; spin.add(t);
-    const r = new THREE.Mesh(rimGeo, rimMat); r.rotation.x = Math.PI/2; spin.add(r);
+    const t = new THREE.Mesh(tireGeom(7.5, 8), tireMat); t.rotation.x = Math.PI/2; spin.add(t);
+    const r = new THREE.Mesh(G('rim', () => new THREE.CylinderGeometry(4.5, 4.5, 8.2, 20)), rimMat); r.rotation.x = Math.PI/2; spin.add(r);
+    const hub = new THREE.Mesh(G('hub', () => new THREE.CylinderGeometry(1.5, 1.5, 8.8, 10)), carbon); hub.rotation.x = Math.PI/2; spin.add(hub);
     wheels.push(spin); if (x > 0) fronts.push(pivot);
   }
-  const flame = add(new THREE.ConeGeometry(4, 22, 10), new THREE.MeshBasicMaterial({ color: 0xff9100 }), -36, 14, 0); flame.rotation.z = Math.PI/2;
+  const flame = add(new THREE.ConeGeometry(4, 22, 12), new THREE.MeshBasicMaterial({ color: 0xff9100 }), -36, 14, 0); flame.rotation.z = Math.PI/2;
   const sparkMat = new THREE.MeshBasicMaterial({ color: 0x40c4ff });
-  const sparks = [add(new THREE.SphereGeometry(3.5, 8, 6), sparkMat, -18, 3, 17), add(new THREE.SphereGeometry(3.5, 8, 6), sparkMat, -18, 3, -17)];
+  const sparks = [add(sph(3.5, 8), sparkMat, -18, 3, 17), add(sph(3.5, 8), sparkMat, -18, 3, -17)];
+  bakeStatic(body, new Set([...wheels.map(w => w.parent), flame, ...sparks]));
   shadows(body, true, false); flame.castShadow = false; sparks.forEach(s => s.castShadow = false);
-  const shield = new THREE.Mesh(new THREE.SphereGeometry(38, 18, 12), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
+  const shield = new THREE.Mesh(sph(38, 18), new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: .35 }));
   shield.position.y = 18; root.add(shield);
   scene.add(root);
   return { root, body, flame, sparks, sparkMat, shield, wheels, fronts };
@@ -1221,7 +1340,7 @@ function makeCar(d, ai, skill, gridIdx, side, veh = 'kart'){
     item:null, itemCount:0, rollT:0, aiUseT:0, roll:0, pitch:0, prevVf:0, wheelA:0, emitT:0, prevW:null, stallT:0, gasAt:null, mesh: veh === 'bike' ? makeBikeMesh(d) : makeKartMesh(d) };
 }
 function clearRace(){
-  for (const c of cars) scene.remove(c.mesh.root);
+  for (const c of cars){ scene.remove(c.mesh.root); c.mesh.root.traverse(o => { if (o.geometry && o.geometry.userData.own) o.geometry.dispose(); }); }
   for (const b of balls) scene.remove(b.m); for (const s of slicks) world.remove(s.m);
   balls = []; slicks = []; finishOrder = []; raceTime = 0; clearSkids();
   for (const p of particles){ p.life = 0; p.s.visible = false; }
@@ -2205,8 +2324,23 @@ setInterval(() => {
   while (el > 0){ const d = Math.min(1/60, el); step(d); el -= d; }
 }, 100);
 let last = performance.now();
+// ===== Automatische kwaliteit: houdt het spel soepel =====
+// Meet hoe lang een beeldje duurt. Te traag? Dan iets minder pixels. Ruimte over? Dan weer scherper.
+const MAX_PR = Math.min(IS_TOUCH ? 1.5 : 2, devicePixelRatio || 1);
+let quality = 1, frameAvg = 16, qTimer = 0;
+function adaptQuality(rawMs, dt){
+  if (document.hidden || rawMs > 250) return;            // tabblad weg of haperen bij laden: niet meetellen
+  frameAvg += (rawMs - frameAvg)*0.05; qTimer += dt;
+  if (qTimer < 2) return; qTimer = 0;
+  let q = quality;
+  if (frameAvg > 22 && quality > 0.55) q = quality - 0.15;          // onder ~45 beelden per seconde
+  else if (frameAvg < 14.5 && quality < 1) q = Math.min(1, quality + 0.1);
+  if (q !== quality){ quality = q; renderer.setPixelRatio(Math.max(0.6, MAX_PR*quality)); resize(); }
+}
 function loop(t){
+  const rawMs = t - last;
   const dt = Math.min(0.033, Math.max(0, (t-last)/1000)); last = t;
+  adaptQuality(rawMs, dt);
   step(dt);
   for (const c of cars) syncKart(c, dt);
   updateCamera(dt); drawHUD();
