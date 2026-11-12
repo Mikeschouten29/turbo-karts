@@ -304,9 +304,9 @@ if (typeof THREE === 'undefined') {
   throw new Error('three.js niet geladen');
 }
 // ================= Instellingen =================
-const RACE_SIZE = 8;   // aantal karts per race
-const LAPS = 3, ROAD = 215, SC = 1.4, CURB = 20, WALL = ROAD/2 + 62, GRAV = 1400, TUN_H = 80;
-const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
+const RACE_SIZE = 12;   // aantal karts per race
+const LAPS = 3, ROAD = 250, SC = 1.4, CURB = 20, WALL = ROAD/2 + 62, GRAV = 1400, TUN_H = 80;
+const POINTS = [15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const wrap = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
 const $ = id => document.getElementById(id);
@@ -324,6 +324,8 @@ const DRIVERS = [
   { name:'Sara',  color:0x00bfa5, css:'#00bfa5', face:'🐼', top:0.99, acc:1.06, turn:1.04 },
   { name:'Jesse', color:0x546e7a, css:'#546e7a', face:'🐺', top:1.06, acc:0.86, turn:0.94 },
   { name:'Mila',  color:0xc6ff00, css:'#aeea00', face:'🐰', top:0.95, acc:1.18, turn:1.08 },
+  { name:'Daan',  color:0xeceff1, css:'#cfd8dc', face:'🐨', top:1.02, acc:0.98, turn:1.00 },
+  { name:'Lotte', color:0x8d6e63, css:'#8d6e63', face:'🦉', top:0.97, acc:1.10, turn:1.06 },
 ];
 const ITEMS = {
   turbo:  { icon:'🚀', name:'Turbo' },
@@ -417,6 +419,9 @@ const asphaltTex = canvasTex(256, 512, (g,w,h) => {
   g.fillStyle = '#4b4e53'; g.fillRect(0,0,w,h); const r = rng(3);
   for (let i = 0; i < 14000; i++){ const v = 60 + r()*50 | 0; g.fillStyle = `rgb(${v},${v},${v+3})`; g.fillRect(r()*w, r()*h, 1+r()*2, 1+r()*2); }
   g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(w*0.3, 0, w*0.14, h); g.fillRect(w*0.56, 0, w*0.14, h);
+  for (let i = 0; i < 5; i++){ const v = r() < .5 ? 'rgba(25,27,30,.35)' : 'rgba(110,112,118,.22)'; g.fillStyle = v; g.fillRect(20 + r()*(w-80), r()*h, 30 + r()*50, 20 + r()*70); }   // reparatievlakken
+  g.strokeStyle = 'rgba(20,20,22,.55)'; g.lineWidth = 1.2;
+  for (let i = 0; i < 9; i++){ let x = 20 + r()*(w-40), y = r()*h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 6; k++){ x += (r()-.5)*18; y += 4 + r()*10; g.lineTo(x, y); } g.stroke(); }   // scheurtjes
   g.fillStyle = '#f2f2f2'; g.fillRect(8, 0, 7, h); g.fillRect(w-15, 0, 7, h); g.fillRect(w/2-3, 0, 6, h*0.45);
 });
 asphaltTex.wrapS = asphaltTex.wrapT = THREE.RepeatWrapping;
@@ -711,10 +716,73 @@ function buildTrack(k){
 
   // --- startvakken op het asfalt ---
   const gridMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
-  for (const [gi, lat] of [[N-2,-58],[N-2,58],[N-5,-58],[N-5,58],[N-8,-58],[N-8,58],[N-11,-58],[N-11,58]]){
+  for (const [gi, lat] of [[N-2,-80],[N-2,0],[N-2,80],[N-5,-80],[N-5,0],[N-5,80],[N-8,-80],[N-8,0],[N-8,80],[N-11,-80],[N-11,0],[N-11,80]]){
     const g = onTrack(gi + 1, lat, 1.4);
     const mk = (w, d, x, z) => { const mm = flat(new THREE.Mesh(new THREE.PlaneGeometry(w, d), gridMat)); mm.position.set(x, 0, z); g.add(mm); };
     mk(4, 40, 0, 0); mk(16, 4, -8, -18); mk(16, 4, -8, 18);
+  }
+
+  // --- welke kant is de buitenkant van de baan? ---
+  const outerSide = PTS.map((p, i) => { const n = nrm(i); return inside(p.x + n.x*(WALL+80), p.y + n.y*(WALL+80)) ? -1 : 1; });
+
+  // --- vangnetten (gaashekken) langs de buitenkant ---
+  const fenceTex = canvasTex(64, 64, (g,w,h) => { g.clearRect(0,0,w,h); g.strokeStyle = 'rgba(210,220,228,.95)'; g.lineWidth = 2.2;
+    g.beginPath(); g.moveTo(0,0); g.lineTo(w,h); g.moveTo(w,0); g.lineTo(0,h); g.stroke(); });
+  fenceTex.wrapS = fenceTex.wrapT = THREE.RepeatWrapping; fenceTex.repeat.set(3, 10);
+  const fenceMat = new THREE.MeshBasicMaterial({ map: fenceTex, transparent: true, alphaTest: 0.25, side: THREE.DoubleSide, color: TH.stars ? 0x9aa4b5 : 0xffffff });
+  const railMat = new THREE.MeshLambertMaterial({ color: 0x78909c, side: THREE.DoubleSide });
+  for (const sd of [1, -1]){
+    const skipF = i => P(i).gap || P(i).tunnel || P(i).bridge || outerSide[i] !== sd || outerSide[(i+1)%N] !== sd;
+    strip(sd*(WALL+8), 20, sd*(WALL+8), 62, fenceMat, null, skipF);
+    strip(sd*(WALL+8), 62, sd*(WALL+8), 64.5, railMat, null, skipF);
+  }
+  { // palen van het hek
+    const posts = [];
+    for (let i = 0; i < N; i += 3){ const p = P(i); if (p.gap || p.tunnel || p.bridge) continue; const sd = outerSide[i], n = nrm(i);
+      posts.push([p.x + n.x*sd*(WALL+8), p.h, p.y + n.y*sd*(WALL+8)]); }
+    if (posts.length){
+      const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 1.4, 46, 6), railMat, posts.length), m = new THREE.Matrix4();
+      posts.forEach(([x, h, z], k) => { m.makeTranslation(x, h + 41, z); pm.setMatrixAt(k, m); }); addW(pm);
+    }
+  }
+
+  // --- kleine tribunes met publiek op meerdere plekken ---
+  const noTree = [STAND, PIT].filter(Boolean);
+  const crowdGeo = new THREE.BoxGeometry(7, 13, 6), crowdMat = new THREE.MeshLambertMaterial(), benchMat = new THREE.MeshStandardMaterial({ color: 0x9e9e9e, roughness: .9 });
+  [0.22, 0.47, 0.72].forEach((fr, q) => {
+    let pick = -1;
+    for (let t = 0; t < 40 && pick < 0; t++){
+      const i = (Math.floor(N*fr) + t) % N, p = P(i);
+      if (p.h > 2 || p.tunnel || p.bridge || p.ramp || p.gap) continue;
+      const sd = outerSide[i], n = nrm(i), cx = p.x + n.x*sd*(WALL+75), cz = p.y + n.y*sd*(WALL+75);
+      let free = true;
+      for (let j = 0; j < N && free; j += 2){ const di = Math.min(Math.abs(i-j), N-Math.abs(i-j)); if (di > 14 && Math.hypot(PTS[j].x-cx, PTS[j].y-cz) < WALL+120) free = false; }
+      if (free && noTree.every(o => Math.hypot(o.x-cx, o.z-cz) > 380)) pick = i;
+    }
+    if (pick < 0) return;
+    const sd = outerSide[pick], L = 220, T = 4;
+    const g = onTrack(pick, sd*(WALL+34), -P(pick).h); if (sd === 1) g.rotation.y += Math.PI;
+    for (let t = 0; t < T; t++){ const b = new THREE.Mesh(new THREE.BoxGeometry(L, 10 + t*10, 16), benchMat); b.position.set(0, (10 + t*10)/2, -t*16); g.add(b); }
+    const crowd = new THREE.InstancedMesh(crowdGeo, crowdMat, Math.floor(L/9)*T), m = new THREE.Matrix4(), c = new THREE.Color(), rc = rng(30 + q); let n = 0;
+    for (let t = 0; t < T; t++) for (let x = -L/2 + 8; x < L/2 - 8 && n < crowd.count; x += 9){
+      if (rc() < 0.12) continue;
+      m.makeTranslation(x + rc()*3, 10 + t*10 + 6.5, -t*16 + 2); crowd.setMatrixAt(n, m); c.setHSL(rc(), 0.7, 0.42 + rc()*0.22); crowd.setColorAt(n, c); n++; }
+    crowd.count = n; g.add(crowd);
+    for (const x of [-L/2, L/2]){ const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 90, 6), metal); pole.position.set(x, 45, -T*16); g.add(pole);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(30, 18), new THREE.MeshLambertMaterial({ color: DRIVERS[(q*3 + (x > 0 ? 1 : 0)) % DRIVERS.length].color, side: THREE.DoubleSide }));
+      flag.position.set(x + 15, 80, -T*16); g.add(flag); const ph = q + x; worldAnims.push(t => { flag.rotation.y = Math.sin(t*3 + ph)*0.35; }); }
+    // het publiek springt af en toe op
+    worldAnims.push(t => { crowd.position.y = Math.max(0, Math.sin(t*6 + q*2)) * 1.6; });
+    shadows(g); noTree.push({ x: g.position.x, z: g.position.z });
+  });
+
+  // --- zon met gloed (overdag) ---
+  if (!TH.stars){
+    const dirSun = new THREE.Vector3(-500, 900, 350).normalize();
+    const glowS = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0xfff1c4, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    glowS.scale.set(5200, 5200, 1); glowS.position.set(CX + dirSun.x*22000, dirSun.y*22000, CZ + dirSun.z*22000); addW(glowS);
+    const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0xffffff, transparent: true, opacity: 1, depthWrite: false, fog: false }));
+    core.scale.set(1400, 1400, 1); core.position.copy(glowS.position); addW(core);
   }
 
   // --- wolken (overdag) ---
@@ -735,7 +803,7 @@ function buildTrack(k){
   boxes = [];
   const boxGeo = new THREE.OctahedronGeometry(17);
   for (const f of TR.boxes){ const i = idxOf(f);
-    for (const lat of [-75, -25, 25, 75]){
+    for (const lat of [-100, -50, 0, 50, 100]){
       const g = onTrack(i, lat, 26), m = new THREE.Mesh(boxGeo, new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x6633ff, transparent: true, opacity: .9, shininess: 90 }));
       m.castShadow = true; g.add(m); boxes.push({ g, m, x: g.position.x, z: g.position.z, h: P(i).h, off: 0, ph: Math.random()*6 });
     } }
@@ -786,6 +854,7 @@ function buildTrack(k){
     if (!roadClear(x, y, 20) || Math.hypot(x-STAND.x, y-STAND.z) < 420) continue;
     if (TR.theme === 'beach' && y > maxY + 260) continue;
     if (PIT && Math.hypot(x-PIT.x, y-PIT.z) < 300) continue;
+    if (noTree.some(o => Math.hypot(x-o.x, y-o.z) < 260)) continue;
     const t = makeTree(TR.theme === 'desert' && R() < 0.3 ? 'rock' : TH.trees); t.position.set(x, 0, y); shadows(t, true, false); addW(t); n++;
   }
   // bergen in de verte
@@ -1139,7 +1208,7 @@ const VEHICLES = {
   kart: { name: 'Kart', icon: '🏎️', desc: 'Stevig, duwt anderen weg', top: 1, acc: 1, turn: 1, mass: 1 },
   bike: { name: 'Motor', icon: '🏍️', desc: 'Wendbaar en snel weg, maar licht', top: 0.97, acc: 1.08, turn: 1.12, mass: 0.7 },
 };
-const AI_BIKES = new Set([1, 4, 8]);   // Luna, Rico en Jesse rijden als computerspeler op een motor
+const AI_BIKES = new Set([1, 4, 8, 11]);   // Luna, Rico en Jesse rijden als computerspeler op een motor
 let vehicle = 'kart'; try { if (localStorage.getItem('turbokarts_vehicle') === 'bike') vehicle = 'bike'; } catch(e){}
 function makeCar(d, ai, skill, gridIdx, side, veh = 'kart'){
   const V = VEHICLES[veh] || VEHICLES.kart;
@@ -1179,8 +1248,8 @@ function setupRace(){
   clearRace(); firstFin = null;
   const humans = net.role ? net.roster : [{ id: 'local', d: selected }];
   const used = new Set(humans.map(h => h.d)), ais = DRIVERS.map((_, i) => i).filter(i => !used.has(i)).slice(0, Math.max(0, RACE_SIZE - humans.length));
-  const skills = [0.97, 0.955, 0.94, 0.925, 0.91, 0.895, 0.88];
-  const grid = [[N-2,-58],[N-2,58],[N-5,-58],[N-5,58],[N-8,-58],[N-8,58],[N-11,-58],[N-11,58]];
+  const skills = Array.from({ length: RACE_SIZE }, (_, i) => 0.97 - i*0.0085);
+  const grid = [[N-2,-80],[N-2,0],[N-2,80],[N-5,-80],[N-5,0],[N-5,80],[N-8,-80],[N-8,0],[N-8,80],[N-11,-80],[N-11,0],[N-11,80]];
   cars = [];
   ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i]*LV().skill, grid[i][0], grid[i][1], AI_BIKES.has(di) ? 'bike' : 'kart')));
   humans.forEach((h, i) => { const g = grid[ais.length + i], c = makeCar(DRIVERS[h.d], false, 0.9, g[0], g[1], h.v || (net.role ? 'kart' : vehicle)); c.owner = h.id; c.itemSeen = 0; cars.push(c); });
@@ -1679,7 +1748,7 @@ function playerInput(){
 }
 function aiInput(c, t){
   const look = 10 + Math.floor(Math.abs(c.vf)/45), i = c.idx + look, p = P(i), d = dir(i);
-  const off = (P(c.idx+4).ramp || P(c.idx+4).gap) ? 0 : Math.sin(t*0.3 + c.phase) * 45;
+  const off = (P(c.idx+4).ramp || P(c.idx+4).gap) ? 0 : Math.sin(t*0.3 + c.phase) * ROAD*0.28;
   const tx = p.x - d.y*off, ty = p.y + d.x*off;
   const a = wrap(Math.atan2(ty-c.y, tx-c.x) - c.h);
   const d2 = dir(i+15), curve = Math.abs(wrap(Math.atan2(d2.y,d2.x) - Math.atan2(d.y,d.x)));
