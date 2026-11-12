@@ -1533,10 +1533,10 @@ const CUPS = [
 let cupSel = 0;
 // niveaus van de computerspelers (bots)
 const LEVELS = {
-  easy:    { name: 'Makkelijk', icon: '🐢', skill: 0.88, slow: -0.12, catchUp: 0.04, corner: 1.15, items: 1.8, rocket: 0.5 },
-  normal:  { name: 'Normaal',   icon: '🏎️', skill: 1.00, slow: -0.06, catchUp: 0.10, corner: 1.00, items: 1.0, rocket: 1.0 },
-  hard:    { name: 'Moeilijk',  icon: '🔥', skill: 1.05, slow: -0.03, catchUp: 0.12, corner: 0.85, items: 0.7, rocket: 1.4 },
-  extreme: { name: 'Extreem',   icon: '💀', skill: 1.10, slow: 0,     catchUp: 0.14, corner: 0.72, items: 0.5, rocket: 1.8 },
+  easy:    { name: 'Makkelijk', icon: '🐢', skill: 0.88, slow: -0.14, catchUp: 0.06, corner: 1.15, items: 1.8, rocket: 0.5, gaps: [0.04, -0.32] },
+  normal:  { name: 'Normaal',   icon: '🏎️', skill: 1.00, slow: -0.10, catchUp: 0.10, corner: 1.00, items: 1.0, rocket: 1.0, gaps: [0.14, -0.22] },
+  hard:    { name: 'Moeilijk',  icon: '🔥', skill: 1.05, slow: -0.08, catchUp: 0.13, corner: 0.85, items: 0.7, rocket: 1.4, gaps: [0.22, -0.12] },
+  extreme: { name: 'Extreem',   icon: '💀', skill: 1.10, slow: -0.06, catchUp: 0.16, corner: 0.72, items: 0.5, rocket: 1.8, gaps: [0.3, -0.05] },
 };
 let level = 'normal'; try { const l = localStorage.getItem('turbokarts_level'); if (l in LEVELS) level = l; } catch(e){}
 const LV = () => LEVELS[level] || LEVELS.normal;
@@ -1549,6 +1549,8 @@ function setupRace(){
   const grid = [[N-2,-80],[N-2,0],[N-2,80],[N-5,-80],[N-5,0],[N-5,80],[N-8,-80],[N-8,0],[N-8,80],[N-11,-80],[N-11,0],[N-11,80]];
   cars = [];
   ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i]*LV().skill, grid[i][0], grid[i][1], AI_VEH[di] || 'kart')));
+  { const [hi, lo] = LV().gaps, bots = cars.filter(c => c.ai), rg = rng(7 + currentTrack);
+    bots.forEach((c, i) => { c.targetGap = hi - (hi - lo)*i/Math.max(1, bots.length - 1) + (rg() - 0.5)*0.04; }); }   // de snelste bot wil het verst vooruit
   humans.forEach((h, i) => { const g = grid[ais.length + i], c = makeCar(DRIVERS[h.d], false, 0.9, g[0], g[1], h.v || (net.role ? 'kart' : vehicle)); c.owner = h.id; c.itemSeen = 0; cars.push(c); });
   player = cars.find(c => c.owner === (net.role ? net.myId : 'local')) || cars[cars.length-1];
   camH = player.h; camPos.set(player.x - Math.cos(camH)*120, player.z + 48, player.y - Math.sin(camH)*120);
@@ -2061,7 +2063,14 @@ function playerInput(){
 }
 function aiInput(c, t){
   const look = 10 + Math.floor(Math.abs(c.vf)/45), i = c.idx + look, p = P(i), d = dir(i);
-  const off = (P(c.idx+4).ramp || P(c.idx+4).gap) ? 0 : Math.sin(t*0.3 + c.phase) * ROAD*0.28;
+  let off = (P(c.idx+4).ramp || P(c.idx+4).gap) ? 0 : Math.sin(t*0.3 + c.phase) * ROAD*0.28;
+  if (!P(c.idx+4).ramp && !P(c.idx+4).gap){   // staat er iemand vlak voor? stuur opzij om in te halen
+    const fx = Math.cos(c.h), fy = Math.sin(c.h);
+    for (const o of cars){ if (o === c) continue; const dx = o.x - c.x, dy = o.y - c.y, ahead = dx*fx + dy*fy;
+      if (ahead < 10 || ahead > 130 || Math.abs(-dx*fy + dy*fx) > 42 || Math.abs(o.z - c.z) > 20) continue;
+      const po = P(o.idx), dO = dir(o.idx), oLat = (o.x - po.x)*(-dO.y) + (o.y - po.y)*dO.x;
+      off = clamp(oLat + (oLat > 0 ? -78 : 78), -ROAD*0.4, ROAD*0.4); break; }
+  }
   const tx = p.x - d.y*off, ty = p.y + d.x*off;
   const a = wrap(Math.atan2(ty-c.y, tx-c.x) - c.h);
   const d2 = dir(i+15), curve = Math.abs(wrap(Math.atan2(d2.y,d2.x) - Math.atan2(d.y,d.x)));
@@ -2130,6 +2139,7 @@ function physics(c, inp, dt){
   let vf = c.vx*fx + c.vy*fy, vr = c.vx*rx + c.vy*ry;
   const off = c.dist > ROAD/2 + CURB && c.boostT <= 0, onIce = P(c.idx).ice && !off, grounded = !c.air;
   let maxV = (off ? Math.min(600, 300*(c.offroad || 1)) : 640) * c.top * (c.ai ? c.skill*c.rubber : 1), acc = 520*c.acc;
+  maxV *= 1 + (c.draft || 0)*0.075;                 // slipstream
   if (c.boostT > 0){ maxV = 920*c.top; acc = 1700; }
   if (onIce) acc *= 0.7;
   acc *= 1.25 - 0.55*clamp(vf/maxV, 0, 1);
@@ -2409,8 +2419,19 @@ function update(dt){
     raceTime += dt;
     RANK = ranking();
     let lead = -1e9; for (const h of cars) if (!h.ai) lead = Math.max(lead, h.total);
+    for (const c of cars){   // slipstream: vlak achter een andere wagen word je sneller
+      let dr = 0; const fx = Math.cos(c.h), fy = Math.sin(c.h);
+      for (const o of cars){ if (o === c) continue; const dx = o.x - c.x, dy = o.y - c.y, ahead = dx*fx + dy*fy;
+        if (ahead < 25 || ahead > 170 || Math.abs(o.z - c.z) > 20) continue;
+        if (Math.abs(-dx*fy + dy*fx) < 30) dr = Math.max(dr, 1 - (ahead - 25)/145); }
+      c.draft = (c.draft || 0) + (dr - (c.draft || 0))*Math.min(1, dt*3);
+    }
     for (const c of cars){
-      if (c.ai) c.rubber = 1 + clamp((lead - c.total)/N*0.25, LV().slow, LV().catchUp);
+      if (c.ai){
+        // bijsturen naar de eigen plek in het veld; in de laatste ronde minder, zodat de race eerlijk beslist wordt
+        const gap = (c.total - lead)/N, fade = lead/N >= LAPS - 1 ? 0.35 : 1;
+        c.rubber = 1 + clamp(((c.targetGap ?? 0) - gap)*0.7, LV().slow, LV().catchUp)*fade;
+      }
       const inp = (c.ai || c.finished) ? aiInput(c, simT) : c === player ? playerInput() : netInput(c);
       if (!c.ai && !c.finished) driftLogic(c, inp, dt);
       physics(c, inp, dt); trackProgress(c); vertical(c, dt); effects(c, dt);
@@ -2491,7 +2512,7 @@ function drawHUD(){
   $('time').textContent = fmt(raceTime);
   $('best').textContent = 'Beste ronde ' + fmt(player.best) + (bestEver ? '  ·  record ' + fmt(bestEver) : '');
   $('spd').textContent = Math.round(Math.abs(player.vf)*0.25);
-  $('gear').textContent = player.vf < -5 ? 'achteruit' : 'versnelling ' + gearInfo(player).gear;
+  $('gear').textContent = player.vf < -5 ? 'achteruit' : (player.draft || 0) > 0.4 ? '💨 slipstream' : 'versnelling ' + gearInfo(player).gear;
   const keysList = Object.keys(ITEMS);
   if (player.rollT > 0){ rollIcon = (rollIcon+1)%(keysList.length*4); $('item').textContent = ITEMS[keysList[Math.floor(rollIcon/4)]].icon; $('itemCount').textContent = ''; }
   else { $('item').textContent = player.item ? ITEMS[player.item].icon : ''; $('itemCount').textContent = player.itemCount > 1 ? '×' + player.itemCount : ''; }
