@@ -308,7 +308,7 @@ if (typeof THREE === 'undefined') {
 }
 // ================= Instellingen =================
 const RACE_SIZE = 12;   // aantal karts per race
-const LAPS = 3, ROAD = 250, SC = 1.4, CURB = 20, WALL = ROAD/2 + 62, GRAV = 1400, TUN_H = 80;
+const LAPS = 3, ROAD = 250, SC = 1.62, CURB = 20, WALL = ROAD/2 + 62, GRAV = 1400, TUN_H = 80;
 const POINTS = [15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const wrap = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
@@ -1183,9 +1183,9 @@ for (let i = 0; i < 300; i++){
   s.visible = false; scene.add(s); particles.push({ s, life: 0 });
 }
 let pNext = 0;
-function emit(x, y, z, vx, vy, vz, life, s0, s1, color, alpha){
+function emit(x, y, z, vx, vy, vz, life, s0, s1, color, alpha, grav = 0){
   const p = particles[pNext]; pNext = (pNext+1) % particles.length;
-  Object.assign(p, { x, y, z, vx, vy, vz, life, max: life, s0, s1, alpha });
+  Object.assign(p, { x, y, z, vx, vy, vz, life, max: life, s0, s1, alpha, grav });
   p.s.material.color.setHex(color); p.s.visible = true;
 }
 function updateParticles(dt){
@@ -1193,7 +1193,7 @@ function updateParticles(dt){
     if (p.life <= 0) continue;
     p.life -= dt; if (p.life <= 0){ p.s.visible = false; continue; }
     const k = 1 - p.life/p.max;
-    p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt; p.vx *= 0.96; p.vz *= 0.96;
+    p.vy -= (p.grav || 0)*dt; p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt; p.vx *= 0.96; p.vz *= 0.96;
     p.s.position.set(p.x, p.y, p.z); p.s.scale.setScalar(p.s0 + (p.s1-p.s0)*k);
     p.s.material.opacity = p.alpha*(1-k);
   }
@@ -1470,16 +1470,16 @@ let camH = 0, shake = 0; const camPos = new THREE.Vector3(), camTgt = new THREE.
 
 // voertuigen: de motor is wendbaarder en trekt sneller op, maar is lichter bij botsingen
 const VEHICLES = {
-  kart:    { name: 'Kart',         icon: '🏎️', desc: 'Stevig en wendbaar', top: 1, acc: 1, turn: 1, mass: 1, off: 1 },
-  bike:    { name: 'Motor',        icon: '🏍️', desc: 'Super wendbaar, maar licht', top: 0.97, acc: 1.08, turn: 1.12, mass: 0.7, off: 0.9 },
-  formula: { name: 'Formulewagen', icon: '🏁', desc: 'Supersnel rechtdoor', top: 1.07, acc: 0.93, turn: 0.93, mass: 1.05, off: 0.8 },
-  buggy:   { name: 'Buggy',        icon: '🚙', desc: 'Raast door gras en zand', top: 0.96, acc: 1.02, turn: 0.98, mass: 1.2, off: 1.7 },
+  kart:    { name: 'Kart',         icon: '🏎️', desc: 'Stevig en wendbaar', top: 1, acc: 1, turn: 1, mass: 1, off: 1, grip: 1, aero: 0.95 },
+  bike:    { name: 'Motor',        icon: '🏍️', desc: 'Super wendbaar, maar licht', top: 0.97, acc: 1.08, turn: 1.12, mass: 0.7, off: 0.9, grip: 1.05, aero: 0.95 },
+  formula: { name: 'Formulewagen', icon: '🏁', desc: 'Supersnel, veel grip in snelle bochten', top: 1.07, acc: 0.96, turn: 0.98, mass: 1.05, off: 0.8, grip: 1.35, aero: 0.7 },
+  buggy:   { name: 'Buggy',        icon: '🚙', desc: 'Raast door gras en zand', top: 0.96, acc: 1.02, turn: 0.98, mass: 1.2, off: 1.7, grip: 0.95, aero: 0.95 },
 };
 const AI_VEH = { 1: 'bike', 4: 'bike', 8: 'bike', 11: 'bike', 2: 'buggy', 10: 'buggy', 6: 'formula', 9: 'formula' };   // wat de bots rijden   // Luna, Rico en Jesse rijden als computerspeler op een motor
 let vehicle = 'kart'; try { const sv = localStorage.getItem('turbokarts_vehicle'); if (sv in VEHICLES) vehicle = sv; } catch(e){}
 function makeCar(d, ai, skill, gridIdx, side, veh = 'kart'){
   const V = VEHICLES[veh] || VEHICLES.kart;
-  d = { ...d, top: d.top*V.top, acc: d.acc*V.acc, turn: d.turn*V.turn, vehicle: veh, mass: V.mass, offroad: V.off };
+  d = { ...d, top: d.top*V.top, acc: d.acc*V.acc, turn: d.turn*V.turn, vehicle: veh, mass: V.mass, offroad: V.off, gripMul: V.grip || 1, aero: V.aero ?? 0.95 };
   const dd = dir(gridIdx), p = P(gridIdx);
   return { ...d, ai, skill, x: p.x - dd.y*side, y: p.y + dd.x*side, z: p.h, vz: 0, air: false, slope: 0, slopeVis: 0,
     h: Math.atan2(dd.y, dd.x), vx:0, vy:0, vf:0, vr:0, steerSm:0,
@@ -2100,13 +2100,13 @@ function physics(c, inp, dt){
     vf -= 650*c.slope*dt;                                // zwaartekracht op hellingen
   } else vf -= vf*0.05*dt;
   if (c.spinT > 0) vf -= vf*2.5*dt;
-  let grip = (c.drifting ? 3.0 : off ? 3.5 : 8) * TH.grip;
+  let grip = (c.drifting ? 3.0 : off ? 3.5 : 8) * TH.grip * (c.gripMul || 1);
   if (onIce) grip = 1.3; if (!grounded) grip = 0.6;
   vr *= Math.exp(-grip*dt);
   let steer = inp.steer;
   if (c.drifting) steer = c.driftDir*(0.6 + 0.45*inp.steer*c.driftDir);
   const sp = Math.min(1, Math.abs(vf)/180) * Math.sign(vf);
-  const turn = (2.6 - Math.min(1, Math.abs(vf)/640)*0.95) * c.turn * (grounded ? 1 : 0.35);
+  const turn = (2.6 - Math.min(1, Math.abs(vf)/640)*(c.aero ?? 0.95)) * c.turn * (grounded ? 1 : 0.35);
   c.steerSm += (steer - c.steerSm)*Math.min(1, dt*8);
   c.h += c.steerSm*turn*sp*dt;
   c.vx = fx*vf + rx*vr; c.vy = fy*vf + ry*vr;
@@ -2157,11 +2157,28 @@ function trackProgress(c){
   if (c.dist > lim){
     const p = PTS[best], nx = (c.x-p.x)/c.dist, ny = (c.y-p.y)/c.dist;
     c.x = p.x + nx*lim; c.y = p.y + ny*lim; c.dist = lim;
-    const vn = c.vx*nx + c.vy*ny;
+    const vn = c.vx*nx + c.vy*ny, speed = Math.hypot(c.vx, c.vy) || 1;
     if (vn > 0){
-      c.vx -= nx*vn*1.4; c.vy -= ny*vn*1.4; c.vx *= 0.9; c.vy *= 0.9;
-      if (vn > 120){ for (let i = 0; i < 4; i++) emit(c.x+nx*14, c.z+10, c.y+ny*14, (Math.random()-.5)*60, 30, (Math.random()-.5)*60, 0.6, 8, 26, 0xbbbbbb, .5);
-        if (c === player){ sfx.bump(); shake = Math.min(1, vn/400); } }
+      // echte klap: hoe rechter je de muur raakt, hoe meer snelheid je verliest
+      const impact = vn/speed;                                      // 0 = schampen, 1 = recht ertegenaan
+      c.vx -= nx*vn*1.25; c.vy -= ny*vn*1.25;                       // kleine terugkaats
+      const keep = 1 - clamp(impact*impact*0.9 + impact*0.12, 0, 0.75);   // schampen kost weinig, frontaal veel
+      c.vx *= keep; c.vy *= keep;
+      // wagen draait een beetje mee langs de muur
+      let tx = -ny, ty = nx; if (tx*Math.cos(c.h) + ty*Math.sin(c.h) < 0){ tx = -tx; ty = -ty; }
+      c.h += wrap(Math.atan2(ty, tx) - c.h)*clamp(1 - impact, 0.2, 0.9);   // bij schampen meteen langs de muur
+      if (impact > 0.45) c.drifting = false;
+      // vonken
+      const n = Math.min(16, 2 + (vn/35 | 0));
+      for (let i = 0; i < n; i++) emit(c.x + nx*16, c.z + 5 + Math.random()*8, c.y + ny*16,
+        -nx*(40 + Math.random()*120) + (Math.random()-.5)*160, 50 + Math.random()*110, -ny*(40 + Math.random()*120) + (Math.random()-.5)*160,
+        0.35 + Math.random()*0.3, 4.5, 1, Math.random() < .5 ? 0xffd54f : 0xff8f00, 1, 600);
+      if (vn > 160) for (let i = 0; i < 3; i++) emit(c.x + nx*14, c.z + 10, c.y + ny*14, (Math.random()-.5)*60, 30, (Math.random()-.5)*60, 0.6, 8, 26, 0xbbbbbb, .45);
+      if (c === player && vn > 70){ beep(110 + Math.random()*40, .12 + impact*.1, 'sawtooth', Math.min(.14, .04 + vn/2500), -60); shake = Math.min(1, vn/320); }
+    } else if (speed > 180){
+      // schuren langs de muur: een beetje vertragen en vonken
+      c.vx *= 0.996; c.vy *= 0.996;
+      if (Math.random() < 0.5) emit(c.x + nx*16, c.z + 6, c.y + ny*16, (Math.random()-.5)*80 - c.vx*0.2, 40 + Math.random()*60, (Math.random()-.5)*80 - c.vy*0.2, 0.3, 3.5, 1, 0xffc107, 1, 600);
     }
   }
   const fl = Math.floor(c.total/N);
