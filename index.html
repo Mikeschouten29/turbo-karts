@@ -80,6 +80,11 @@
   #onCode{font-size:18px;font-weight:800;text-align:center}
   #onCode b{font-size:38px;letter-spacing:7px;color:#ffeb3b;background:#0006;padding:2px 14px;border-radius:12px;margin-left:6px}
   #onPlayers{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  #invite{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:center}
+  #qrImg{width:132px;height:132px;background:#fff;padding:6px;border-radius:12px;image-rendering:pixelated}
+  #inviteSide{display:flex;flex-direction:column;gap:6px;align-items:flex-start;max-width:280px}
+  #inviteHelp{font-size:13px;font-weight:600;opacity:.9}
+  #inviteUrl{font-size:12px;word-break:break-all;opacity:.75;user-select:text;-webkit-user-select:text}
   .pl{background:#ffffff26;border-radius:20px;padding:5px 12px;font-weight:700;font-size:15px}
   #onStatus{font-weight:700;color:#ffcc80;min-height:1em}
   #subModes{display:flex;gap:8px}
@@ -184,6 +189,14 @@
     </div>
     <div id="onLobby" hidden>
       <div id="onCode"></div>
+      <div id="invite" hidden>
+        <img id="qrImg" alt="QR-code om mee te doen">
+        <div id="inviteSide">
+          <button id="shareBtn" class="small">📤 Uitnodiging delen</button>
+          <div id="inviteHelp">Vrienden scannen de QR-code met hun camera, of tikken op de gedeelde link. Ze doen dan meteen mee.</div>
+          <div id="inviteUrl"></div>
+        </div>
+      </div>
       <div id="onPlayers"></div>
       <div id="onHostOpts">
         <div id="subModes"><button class="mode" data-s="cup">🏆 Kampioenschap</button><button class="mode" data-s="single">🏁 Losse race</button></div>
@@ -228,6 +241,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 if (typeof THREE === 'undefined') {
   document.body.innerHTML = '<h2 style="padding:40px;color:#000">Het 3D-onderdeel (three.js) kon niet laden. Heb je internet?</h2>';
@@ -1055,6 +1069,7 @@ function buildMenu(){
     if (net.role === 'client') $('onWait').textContent = 'Wachten tot de host start… (' + (net.sub === 'cup' ? '🏆 kampioenschap' : '🏁 ' + TRACKS[menuTrack].name) + ')';
     document.querySelectorAll('#subModes .mode').forEach(b => b.classList.toggle('sel', b.dataset.s === net.sub));
   }
+  updateInvite();
   const tb = $('tracks'); tb.hidden = !(mode === 'single' || (on && net.role === 'host' && net.sub === 'single')); tb.innerHTML = '';
   TRACKS.forEach((t, i) => {
     let rec = null; try { rec = parseFloat(localStorage.getItem('turbokarts_best_' + t.id)) || null; } catch(e){}
@@ -1065,6 +1080,40 @@ function buildMenu(){
   });
   $('startBtn').hidden = on && net.role !== 'host';
   $('startBtn').textContent = on ? 'START ONLINE (' + net.roster.length + ' ' + (net.roster.length === 1 ? 'speler' : 'spelers') + ') ▶' : mode === 'cup' ? 'START KAMPIOENSCHAP ▶' : 'START RACE ▶';
+}
+// ===== Uitnodigen: link met code, QR-code en delen =====
+const GAME_URL = 'https://mikeschouten29.github.io/turbo-karts/';
+const inviteUrl = () => (location.protocol.startsWith('http') ? location.origin + location.pathname : GAME_URL) + '?join=' + net.code;
+let qrFor = '';
+function updateInvite(){
+  const show = net.role === 'host';
+  $('invite').hidden = !show;
+  if (!show || qrFor === net.code) return;
+  qrFor = net.code;
+  const url = inviteUrl();
+  $('inviteUrl').textContent = url;
+  try { const qr = qrcode(0, 'M'); qr.addData(url); qr.make(); $('qrImg').src = qr.createDataURL(6, 2); $('qrImg').hidden = false; }
+  catch(e){ $('qrImg').hidden = true; }
+}
+async function shareInvite(){
+  const url = inviteUrl(), text = '🏎️ Race je mee in Turbo Karts? Tik op de link, of typ code ' + net.code + ' bij Online → Meedoen.';
+  if (navigator.share){
+    try { await navigator.share({ title: 'Turbo Karts', text, url }); return; }
+    catch(e){ if (e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(text + '\n' + url); netStatus('Uitnodiging gekopieerd! Plak hem in WhatsApp of een bericht.'); }
+  catch(e){ netStatus('Stuur deze link: ' + url); }
+}
+$('shareBtn').onclick = shareInvite;
+// geopend via een uitnodigingslink (?join=CODE): meteen meedoen
+function autoJoinFromLink(){
+  const code = (new URLSearchParams(location.search).get('join') || '').toUpperCase();
+  if (!/^[A-Z0-9]{4}$/.test(code)) return;
+  try { history.replaceState(null, '', location.pathname); } catch(e){}
+  mode = 'online'; $('codeIn').value = code; buildMenu();
+  netStatus('Je bent uitgenodigd! Verbinden met ' + code + '…');
+  const tryJoin = (n) => { if (typeof Peer !== 'undefined') joinGame(); else if (n > 0) setTimeout(() => tryJoin(n-1), 500); else netStatus('Online spelen kon niet laden. Heb je internet?'); };
+  tryJoin(20);
 }
 function chooseDriver(i){
   if (net.role === 'client'){ net.host.send({ t:'driver', d: i }); return; }
@@ -1638,7 +1687,7 @@ function loop(t){
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
-buildTrack(0); setupRace(); buildMenu();
+buildTrack(0); setupRace(); buildMenu(); autoJoinFromLink();
 requestAnimationFrame(loop);
 </script>
 </body>
