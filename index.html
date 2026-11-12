@@ -59,8 +59,13 @@
   .mode{font-size:19px;padding:10px 22px;border-radius:16px;background:#ffffff22;color:#fff;box-shadow:none;border:3px solid transparent}
   .mode.sel{border-color:#ffeb3b;background:#ffffff38}
   .mode small{display:block;font-size:12px;font-weight:600;opacity:.85}
-  .keys{font-size:14px;line-height:1.7;text-align:center;opacity:.95}
-  kbd{background:#fff;color:#222;border-radius:5px;padding:1px 7px;font-weight:800;font-family:inherit;box-shadow:0 2px 0 #999}
+  .keys{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 18px;max-width:640px;
+    font-size:13px;font-weight:600;color:#ffffffe0;background:#00000059;padding:9px 16px;border-radius:12px;text-shadow:none}
+  .keys span{white-space:nowrap}
+  .keys small{flex-basis:100%;text-align:center;font-size:11px;font-weight:500;opacity:.6}
+  kbd{display:inline-block;min-width:1.4em;text-align:center;background:#ffffffe6;color:#222;border-radius:4px;padding:0 5px;margin-right:4px;
+    font-size:11px;font-weight:800;font-family:inherit;line-height:1.6}
+  kbd + kbd{margin-left:-1px}
   button{font:inherit;font-size:22px;font-weight:900;padding:12px 34px;border-radius:40px;border:0;background:#69f0ae;color:#063;cursor:pointer;box-shadow:0 5px 0 #2e7d32}
   button:active{transform:translateY(3px);box-shadow:0 2px 0 #2e7d32}
   button.alt{background:#fff;color:#333;box-shadow:0 5px 0 #999}
@@ -98,7 +103,7 @@
   .overlay{justify-content:safe center}
   /* ===== aanraakbediening (telefoon/tablet) ===== */
   .only-touch{display:none}
-  body.touch .only-touch{display:block}
+  body.touch .only-touch{display:flex}
   body.touch .only-keys{display:none}
   #tbar,#tLeft,#tRight{display:none}
   body.touch #itemhint{display:none}
@@ -209,13 +214,13 @@
     <div id="onStatus" class="shadow"></div>
   </div>
   <div id="tracks" hidden></div>
-  <div class="keys shadow only-touch">
-    📱 Stuur met ◀ ▶ of zet <b>kantelen</b> aan · houd <b>DRIFT</b> vast in een bocht voor een turbo · 🎁 = item gebruiken<br>
-    Draai je telefoon liggend voor het beste beeld
+  <div class="keys only-touch">
+    <span>◀ ▶ sturen</span><span>DRIFT in de bocht</span><span>🎁 item</span>
+    <small>Telefoon liggend geeft het beste beeld</small>
   </div>
-  <div class="keys shadow only-keys">
-    <kbd>↑</kbd>/<kbd>W</kbd> gas &nbsp; <kbd>↓</kbd>/<kbd>S</kbd> rem &nbsp; <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> sturen &nbsp; <kbd>Spatie</kbd> driften (loslaten = turbo)<br>
-    ✨ kristallen = item, gebruik met <kbd>E</kbd>/<kbd>X</kbd> &nbsp;·&nbsp; <kbd>M</kbd> geluid &nbsp;·&nbsp; <kbd>R</kbd> opnieuw &nbsp;·&nbsp; <kbd>Esc</kbd> menu
+  <div class="keys only-keys">
+    <span><kbd>W</kbd> gas</span><span><kbd>S</kbd> rem</span><span><kbd>A</kbd><kbd>D</kbd> sturen</span><span><kbd>Spatie</kbd> drift</span><span><kbd>E</kbd> item</span><span><kbd>Esc</kbd> menu</span>
+    <small>Pijltjes werken ook · M geluid · R opnieuw</small>
   </div>
   <button id="startBtn">START ▶</button>
 </div>
