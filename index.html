@@ -57,6 +57,7 @@
   .bar i{display:block;height:100%;background:#69f0ae}
   #modes{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
   #vehicles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .cupcard{width:170px} .cupcard .rec{font-size:12px;line-height:1.5}
   .vcard{display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:14px;background:#ffffff22;border:3px solid transparent;cursor:pointer;text-align:left}
   .vcard.sel{border-color:#ffeb3b;background:#ffffff38}
   .vcard .vi{font-size:30px}
@@ -190,7 +191,7 @@
   <div id="vehicles"></div>
   <h2 class="shadow">Wat wil je rijden?</h2>
   <div id="modes">
-    <button class="mode sel" data-m="cup">🏆 Kampioenschap<small>4 banen, punten per plek</small></button>
+    <button class="mode sel" data-m="cup">🏆 Kampioenschap<small>2 cups van 3 banen, punten per plek</small></button>
     <button class="mode" data-m="single">🏁 Losse race<small>kies zelf een baan</small></button>
     <button class="mode" data-m="online">🌐 Online<small>met vrienden, elk op eigen apparaat</small></button>
   </div>
@@ -268,8 +269,9 @@ if (typeof THREE === 'undefined') {
   throw new Error('three.js niet geladen');
 }
 // ================= Instellingen =================
-const LAPS = 3, ROAD = 190, SC = 1.4, CURB = 20, WALL = ROAD/2 + 62, GRAV = 1400, TUN_H = 80;
-const POINTS = [15, 12, 10, 8, 6, 4];
+const RACE_SIZE = 8;   // aantal karts per race
+const LAPS = 3, ROAD = 215, SC = 1.4, CURB = 20, WALL = ROAD/2 + 62, GRAV = 1400, TUN_H = 80;
+const POINTS = [15, 12, 10, 8, 6, 4, 2, 1];
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const wrap = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
 const $ = id => document.getElementById(id);
@@ -283,6 +285,10 @@ const DRIVERS = [
   { name:'Zoë',   color:0x1e88e5, css:'#1e88e5', face:'🦊', top:0.98, acc:1.05, turn:1.10 },
   { name:'Rico',  color:0x43a047, css:'#43a047', face:'🐸', top:1.03, acc:0.95, turn:0.95 },
   { name:'Fenna', color:0xec407a, css:'#ec407a', face:'🐱', top:0.96, acc:1.15, turn:1.05 },
+  { name:'Noah',  color:0xff6d00, css:'#ff6d00', face:'🦁', top:1.04, acc:0.92, turn:0.96 },
+  { name:'Sara',  color:0x00bfa5, css:'#00bfa5', face:'🐼', top:0.99, acc:1.06, turn:1.04 },
+  { name:'Jesse', color:0x546e7a, css:'#546e7a', face:'🐺', top:1.06, acc:0.86, turn:0.94 },
+  { name:'Mila',  color:0xc6ff00, css:'#aeea00', face:'🐰', top:0.95, acc:1.18, turn:1.08 },
 ];
 const ITEMS = {
   turbo:  { icon:'🚀', name:'Turbo' },
@@ -307,6 +313,12 @@ const TRACKS = [
   { id:'vulkaan', name:'Vulkaanberg', emoji:'🌋', theme:'lava',
     ctrl:[[600,1650,0],[1600,1750,0],[2400,1600,10],[2850,1150,40],[2700,600,70],[2200,350,95],[1600,450,95],[1200,800,60],[800,600,40],[400,700,20],[250,1200,0]],
     boxes:[1.6,4.5,8.5], pads:[0.35], jumps:[{at:0.62, gap:true},{at:2.4}], tunnels:[[5.2,6.6]], ice:[] },
+  { id:'stad', name:'Neonstad', emoji:'🏙️', theme:'city',
+    ctrl:[[500,1700,0],[1500,1720,0],[2250,1680,0],[2750,1450,10],[2850,950,30],[2600,500,50],[2000,350,60],[1500,600,60],[1300,1100,30],[900,1080,10],[500,750,0],[300,1150,0]],
+    boxes:[0.8,5.6,9.5], pads:[0.3,3.3,8.3], jumps:[{at:1.55}], tunnels:[[6.2,7.4]], ice:[] },
+  { id:'woestijn', name:'Woestijncanyon', emoji:'🏜️', theme:'desert',
+    ctrl:[[600,1700,0],[1600,1750,0],[2400,1600,15],[2800,1100,40],[2600,600,60],[2000,450,60],[1700,800,40],[1300,500,30],[800,400,15],[350,700,0],[300,1250,0]],
+    boxes:[0.7,4.5,9.5], pads:[1.2,6.4], jumps:[{at:1.5, gap:true},{at:5.5}], tunnels:[[7.25,8.35]], ice:[], arches:[3.5, 9.6] },
 ];
 const THEMES = {
   beach:{ sky:['#2a8be0','#8cc8f2','#e9f4fb'], fog:[0xe9f4fb,3000,12000], hemi:[0xe8f4ff,0xc8b88a,0.7], sun:[0xfff3dd,1.0],
@@ -321,6 +333,12 @@ const THEMES = {
   lava:{ sky:['#2b0d0a','#6e1f0f','#c2471b'], fog:[0x5a2414,1500,8000], hemi:[0xffa070,0x3a1a10,0.6], sun:[0xffb08a,0.85],
     ground:['#3b302c','#2a221f','#4a3a33','#5a2a1a'], runoff:0x2e2522, wallA:0x212121, wallB:0xff6f00, curbA:0x212121, curbB:0xff9800,
     mount:0x2b2220, snowcap:false, trees:'rock', weather:'ash', grip:1 },
+  city:{ sky:['#070618','#1d1446','#3b1d5e'], stars:true, fog:[0x2a1748,1400,8000], hemi:[0x8a7dff,0x1a1630,0.8], sun:[0xc7b8ff,0.55],
+    ground:['#2b2d33','#24262b','#33363d','#1f2126'], runoff:0x3a3d44, wallA:0xffd600, wallB:0x212121, curbA:0xff1744, curbB:0xeeeeee,
+    mount:0x1a1530, snowcap:false, trees:'none', weather:null, grip:1 },
+  desert:{ sky:['#3b8fd9','#a9d3f2','#f4dcb0'], fog:[0xf4dcb0,2500,11000], hemi:[0xfff1d6,0xc8925a,0.75], sun:[0xfff0c8,1.05],
+    ground:['#d9a066','#c98e55','#e3b27a','#b97d47'], runoff:0xc8955a, wallA:0xd84315, wallB:0xffffff, curbA:0xd84315, curbB:0xffffff,
+    mount:0xb5652b, snowcap:false, trees:'cactus', weather:null, grip:1 },
 };
 
 // ================= Renderer, licht, lucht =================
@@ -381,6 +399,7 @@ const metal = new THREE.MeshStandardMaterial({ color: 0xd0d4d8, metalness: 0.6, 
 
 // ================= Baan-gegevens (worden per baan opnieuw gevuld) =================
 let TR, TH, PTS = [], N = 0, DIST = [], B, CX = 0, CZ = 0, minX, minY, maxX, maxY;
+let worldAnims = [];
 let pads = [], boxes = [], world = null, currentTrack = -1, volcanoTop = null, bestEver = null;
 const P = i => PTS[((i%N)+N)%N];
 function dir(i){ const a = P(i), b = P(i+1), dx = b.x-a.x, dy = b.y-a.y, l = Math.hypot(dx,dy) || 1; return {x:dx/l, y:dy/l}; }
@@ -435,7 +454,7 @@ function buildTrack(k){
     scene.remove(world);
     world.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m.keep) m.dispose(); }); });
   }
-  world = new THREE.Group(); scene.add(world);
+  world = new THREE.Group(); scene.add(world); worldAnims = [];
   TR = TRACKS[k]; TH = THEMES[TR.theme]; currentTrack = k; volcanoTop = null;
   try { bestEver = parseFloat(localStorage.getItem('turbokarts_best_' + TR.id)) || null; } catch(e){ bestEver = null; }
 
@@ -541,7 +560,7 @@ function buildTrack(k){
   }
   // tunnels
   const tunMat = new THREE.MeshStandardMaterial({ color: 0x5d5550, roughness: 0.95, side: THREE.DoubleSide });
-  const rockMat = new THREE.MeshStandardMaterial({ color: TR.theme === 'snow' ? 0x8a8f96 : 0x3b2f2a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
+  const rockMat = new THREE.MeshStandardMaterial({ color: ({ snow: 0x8a8f96, city: 0x55585f, desert: 0xa0522d })[TR.theme] || 0x3b2f2a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
   const notTun = i => !P(i).tunnel;
   const tunRoof = strip(-(WALL+10), TUN_H, WALL+10, TUN_H, tunMat, null, notTun); if (tunRoof) tunRoof.castShadow = true;
   for (const s of [1, -1]){
@@ -604,13 +623,84 @@ function buildTrack(k){
     shadows(g);
   });
 
+  // --- portalen met reclame boven de weg ---
+  const ganTxt = ['TURBO KARTS', 'RACE TV', 'SPEED ★ COLA'], ganCol = ['#283593', '#00897b', '#d81b60'];
+  [0.3, 0.55, 0.8].forEach((fr, q) => {
+    let i = Math.floor(N*fr);
+    for (let t = 0; t < 40 && (P(i).tunnel || P(i).bridge || P(i).ramp || P(i).gap || P(i-3).gap || P(i+3).gap); t++) i++;
+    const g = onTrack(i, 0, 0);
+    for (const s of [-1, 1]){ const pole = new THREE.Mesh(new THREE.BoxGeometry(8, 120, 8), metal); pole.position.set(0, 60, s*(WALL+6)); g.add(pole); }
+    const tex = canvasTex(1024, 96, (c,w,h) => { c.fillStyle = ganCol[q]; c.fillRect(0,0,w,h); c.fillStyle = '#fff'; c.font = '900 58px system-ui,sans-serif';
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(ganTxt[q] + '   ★   ' + ganTxt[q], w/2, h/2+3); });
+    const bm = new THREE.MeshLambertMaterial({ map: tex });
+    const b = new THREE.Mesh(new THREE.BoxGeometry(WALL*2+16, 26, 6), [metal, metal, metal, metal, bm, bm]); b.position.y = 112; b.rotation.y = Math.PI/2; g.add(b);
+    shadows(g);
+  });
+
+  // --- bandenstapels aan de buitenkant van scherpe bochten ---
+  const tireSpots = [];
+  for (let i = 0; i < N; i += 2){
+    const p = P(i); if (p.tunnel || p.bridge || p.gap || p.h > 2) continue;
+    const turn = wrap(Math.atan2(dir(i+4).y, dir(i+4).x) - Math.atan2(dir(i-4).y, dir(i-4).x));
+    if (Math.abs(turn) < 0.35) continue;
+    const lat = -Math.sign(turn)*(WALL + 22), n = nrm(i), x = p.x + n.x*lat, z = p.y + n.y*lat;
+    let ok = true;
+    for (let j = 0; j < N; j += 3){ const di = Math.min(Math.abs(i-j), N-Math.abs(i-j)); if (di > 12 && Math.hypot(PTS[j].x-x, PTS[j].y-z) < WALL+24){ ok = false; break; } }
+    if (ok) tireSpots.push([x, z]);
+  }
+  if (tireSpots.length){
+    const tires = new THREE.InstancedMesh(new THREE.TorusGeometry(7, 3.2, 6, 12), new THREE.MeshLambertMaterial(), tireSpots.length*3);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI/2, 0, 0)), one = new THREE.Vector3(1, 1, 1), c = new THREE.Color(); let n = 0;
+    for (const [x, z] of tireSpots) for (let l = 0; l < 3; l++){
+      m.compose(new THREE.Vector3(x, 3.2 + l*6.4, z), q, one); tires.setMatrixAt(n, m); c.setHex(l === 1 ? TH.wallA : 0x1c1c1c); tires.setColorAt(n, c); n++; }
+    tires.castShadow = true; addW(tires);
+  }
+
+  // --- pitgebouw met garages, tegenover de tribune ---
+  let PIT = null;
+  { const pi = 12, pSide = -sOut, p = P(pi), n = nrm(pi), lat = pSide*(WALL+70), cx = p.x + n.x*lat, cz = p.y + n.y*lat;
+    let ok = p.h < 2;
+    for (let j = 0; j < N && ok; j += 2){ const di = Math.min(Math.abs(pi-j), N-Math.abs(pi-j)); if (di > 20 && Math.hypot(PTS[j].x-cx, PTS[j].y-cz) < WALL+190) ok = false; }
+    if (ok){
+      const g = onTrack(pi, lat, -p.h), L = 360;
+      const wallM = new THREE.MeshStandardMaterial({ color: 0xeceff1, roughness: .7 }), doorM = new THREE.MeshStandardMaterial({ color: 0x37474f, roughness: .5 });
+      const bld = new THREE.Mesh(new THREE.BoxGeometry(L, 46, 70), wallM); bld.position.set(0, 23, pSide*35); g.add(bld);
+      const roofB = new THREE.Mesh(new THREE.BoxGeometry(L+16, 6, 84), new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: .6 })); roofB.position.set(0, 49, pSide*35); g.add(roofB);
+      DRIVERS.slice(0, 6).forEach((d, q) => {
+        const door = new THREE.Mesh(new THREE.BoxGeometry(46, 32, 2), doorM); door.position.set(-L/2 + 30 + q*60, 17, -pSide*0.5); g.add(door);
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(40, 7, 2), new THREE.MeshBasicMaterial({ color: d.color })); sign.position.set(-L/2 + 30 + q*60, 38, -pSide*0.8); g.add(sign);
+      });
+      shadows(g); PIT = { x: g.position.x, z: g.position.z };
+    }
+  }
+
+  // --- startvakken op het asfalt ---
+  const gridMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+  for (const [gi, lat] of [[N-2,-58],[N-2,58],[N-5,-58],[N-5,58],[N-8,-58],[N-8,58],[N-11,-58],[N-11,58]]){
+    const g = onTrack(gi + 1, lat, 1.4);
+    const mk = (w, d, x, z) => { const mm = flat(new THREE.Mesh(new THREE.PlaneGeometry(w, d), gridMat)); mm.position.set(x, 0, z); g.add(mm); };
+    mk(4, 40, 0, 0); mk(16, 4, -8, -18); mk(16, 4, -8, 18);
+  }
+
+  // --- wolken (overdag) ---
+  if (!TH.stars){
+    const cm = new THREE.SpriteMaterial({ map: puffTex, color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false, fog: false });
+    const RC = rng(99);
+    for (let q = 0; q < 24; q++){
+      const cl = new THREE.Group();
+      for (let b = 0; b < 4; b++){ const sp = new THREE.Sprite(cm), s = 500 + RC()*500; sp.scale.set(s, s*0.5, 1); sp.position.set((b-1.5)*240 + RC()*100, RC()*80, RC()*100); cl.add(sp); }
+      const a = RC()*Math.PI*2, r = 1200 + RC()*6500; cl.position.set(CX + Math.cos(a)*r, 1900 + RC()*1200, CZ + Math.sin(a)*r); addW(cl);
+      const sp = 8 + RC()*10; worldAnims.push((t, dt) => { cl.position.x += sp*dt; if (cl.position.x > CX + 9000) cl.position.x = CX - 9000; });
+    }
+  }
+
   // --- boost-pads en itemkristallen ---
   const padMat = new THREE.MeshBasicMaterial({ map: padTex }); padMat.map.keep = true;
   pads = TR.pads.map(f => { const i = idxOf(f), g = onTrack(i, 0, 1.7); g.add(flat(new THREE.Mesh(new THREE.PlaneGeometry(80, 90), padMat))); return { x: g.position.x, z: g.position.z, h: P(i).h }; });
   boxes = [];
   const boxGeo = new THREE.OctahedronGeometry(17);
   for (const f of TR.boxes){ const i = idxOf(f);
-    for (const lat of [-66, -22, 22, 66]){
+    for (const lat of [-75, -25, 25, 75]){
       const g = onTrack(i, lat, 26), m = new THREE.Mesh(boxGeo, new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x6633ff, transparent: true, opacity: .9, shininess: 90 }));
       m.castShadow = true; g.add(m); boxes.push({ g, m, x: g.position.x, z: g.position.z, h: P(i).h, off: 0, ph: Math.random()*6 });
     } }
@@ -623,7 +713,8 @@ function buildTrack(k){
     palm: new THREE.MeshLambertMaterial({ color: 0x43a047, side: THREE.DoubleSide }),
     snow: new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }),
     dead: new THREE.MeshLambertMaterial({ color: 0x3e3530 }),
-    rock: new THREE.MeshStandardMaterial({ color: 0x2f2826, roughness: 1, flatShading: true }),
+    rock: new THREE.MeshStandardMaterial({ color: TR.theme === 'desert' ? 0xa65e2e : 0x2f2826, roughness: 1, flatShading: true }),
+    cactus: new THREE.MeshLambertMaterial({ color: 0x558b2f, flatShading: true }),
   };
   const cone = new THREE.ConeGeometry(1, 1.6, 8);
   function makeTree(type){
@@ -638,6 +729,13 @@ function buildTrack(k){
       for (let q = 0; q < 3; q++){ const l = new THREE.Mesh(cone, type === 'snowpine' && q === 2 ? kit.snow : lm), sc = sz*(1.25 - q*0.3);
         l.scale.set(sc, sc, sc); l.position.y = 24 + sz*0.55 + q*sz*0.62; t.add(l);
         if (type === 'snowpine' && q < 2){ const cap = new THREE.Mesh(cone, kit.snow); cap.scale.set(sc*0.55, sc*0.35, sc*0.55); cap.position.y = l.position.y + sc*0.55; t.add(cap); } }
+    } else if (type === 'cactus'){
+      const cm = kit.cactus, tr = new THREE.Mesh(new THREE.CylinderGeometry(6, 7, 60, 8), cm); tr.position.y = 30; t.add(tr);
+      const top = new THREE.Mesh(new THREE.SphereGeometry(6, 8, 6), cm); top.position.y = 60; t.add(top);
+      for (const sd of [-1, 1]) if (R() < 0.8){ const h = 22 + R()*14;
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 12, 7), cm); arm.rotation.z = Math.PI/2; arm.position.set(sd*10, h, 0); t.add(arm);
+        const up = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 22, 7), cm); up.position.set(sd*15, h + 10, 0); t.add(up);
+        const tip = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 6), cm); tip.position.set(sd*15, h + 21, 0); t.add(tip); }
     } else if (type === 'dead'){
       const tr = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 5, 70, 6), kit.dead); tr.position.y = 35; t.add(tr);
       for (let q = 0; q < 4; q++){ const b = new THREE.Mesh(new THREE.CylinderGeometry(1, 2, 32, 5), kit.dead); b.position.set(0, 35 + q*9, 0);
@@ -648,20 +746,22 @@ function buildTrack(k){
     t.scale.setScalar(s); t.rotation.y = R()*6; return t;
   }
   let tries = 0;
-  for (let n = 0; n < 160 && tries < 7000; tries++){
+  for (let n = 0; n < 160 && tries < 7000 && TH.trees !== 'none'; tries++){
     const x = B.x0 - 500 + R()*(B.x1-B.x0+1000), y = B.y0 - 500 + R()*(B.y1-B.y0+1000);
     if (!roadClear(x, y, 20) || Math.hypot(x-STAND.x, y-STAND.z) < 420) continue;
     if (TR.theme === 'beach' && y > maxY + 260) continue;
-    const t = makeTree(TH.trees); t.position.set(x, 0, y); shadows(t, true, false); addW(t); n++;
+    if (PIT && Math.hypot(x-PIT.x, y-PIT.z) < 300) continue;
+    const t = makeTree(TR.theme === 'desert' && R() < 0.3 ? 'rock' : TH.trees); t.position.set(x, 0, y); shadows(t, true, false); addW(t); n++;
   }
   // bergen in de verte
   const mountMat = new THREE.MeshLambertMaterial({ color: TH.mount, flatShading: true }), capMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
   const ringR = Math.max(maxX-minX, maxY-minY)/2 + 4500;
   for (let i = 0; i < 28; i++){
-    const a = i/28*Math.PI*2; if (TR.theme === 'beach' && Math.sin(a) > 0.1) continue;
+    const a = i/28*Math.PI*2; if (TR.theme === 'beach' && Math.sin(a) > 0.1) continue; if (TR.theme === 'city') continue;
     const r = ringR + R()*1200, h = 1000 + R()*1400 + (TH.snowcap ? 600 : 0), w = 900 + R()*700;
-    const m = new THREE.Mesh(new THREE.ConeGeometry(w, h, 7), mountMat); m.position.set(CX + Math.cos(a)*r, h/2, CZ + Math.sin(a)*r); addW(m);
-    if (TR.theme !== 'lava' && TR.theme !== 'night'){ const s = new THREE.Mesh(new THREE.ConeGeometry(w*0.3, h*0.3, 7), capMat); s.position.set(m.position.x, h*0.85+1, m.position.z); addW(s); }
+    const mesa = TR.theme === 'desert', m = new THREE.Mesh(mesa ? new THREE.CylinderGeometry(w*0.55, w*0.8, h*0.45, 7) : new THREE.ConeGeometry(w, h, 7), mountMat);
+    m.position.set(CX + Math.cos(a)*r, mesa ? h*0.225 : h/2, CZ + Math.sin(a)*r); addW(m);
+    if (!['lava', 'night', 'desert', 'city'].includes(TR.theme)){ const s = new THREE.Mesh(new THREE.ConeGeometry(w*0.3, h*0.3, 7), capMat); s.position.set(m.position.x, h*0.85+1, m.position.z); addW(s); }
   }
   const randomSpot = (extra, tries = 200) => { for (let q = 0; q < tries; q++){ const x = B.x0 + R()*(B.x1-B.x0), y = B.y0 + R()*(B.y1-B.y0); if (roadClear(x, y, extra)) return [x, y]; } return null; };
 
@@ -679,12 +779,37 @@ function buildTrack(k){
     const lamp = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, 22, 12), new THREE.MeshBasicMaterial({ color: 0xfff59d })); lamp.position.y = 232; lh.add(lamp);
     const cap = new THREE.Mesh(new THREE.ConeGeometry(24, 30, 12), new THREE.MeshLambertMaterial({ color: 0x263238 })); cap.position.y = 258; lh.add(cap);
     lh.position.set(minX + 150, 0, maxY + 220); shadows(lh, true, false); addW(lh);
+    // zeilbootjes die op de golven deinen
+    for (let q = 0; q < 7; q++){
+      const b = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(60, 10, 20), new THREE.MeshLambertMaterial({ color: 0xffffff })); hull.position.y = 4; b.add(hull);
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 70, 6), metal); mast.position.y = 40; b.add(mast);
+      const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute([2,12,0, 2,74,0, -32,12,0], 3)); sg.computeVertexNormals();
+      b.add(new THREE.Mesh(sg, new THREE.MeshLambertMaterial({ color: [0xffffff, 0xff7043, 0x4fc3f7][q%3], side: THREE.DoubleSide })));
+      b.position.set(minX + R()*(maxX-minX), 1, maxY + 650 + R()*1600); b.rotation.y = R()*6; addW(b);
+      const ph = R()*6; worldAnims.push(t => { b.position.y = 1 + Math.sin(t*1.5 + ph)*2; b.rotation.z = Math.sin(t*1.1 + ph)*0.06; });
+    }
+    // houten pier
+    const pier = new THREE.Group(), wood = new THREE.MeshLambertMaterial({ color: 0x8d6e63 });
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(40, 4, 420), wood); deck.position.set(0, 12, 210); pier.add(deck);
+    for (let q = 0; q < 8; q++) for (const sd of [-1, 1]){ const post = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 24, 6), wood); post.position.set(sd*17, 4, q*55 + 10); pier.add(post); }
+    pier.position.set(CX + 350, 0, maxY + 320); shadows(pier, true, true); addW(pier);
   }
   if (TR.theme === 'snow'){
     for (let q = 0; q < 8; q++){ const s = randomSpot(30); if (!s) continue; const g = new THREE.Group();
       [[22, 20], [16, 52], [11, 76]].forEach(([r, y]) => { const b = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), kit.snow); b.position.y = y; g.add(b); });
       const nose = new THREE.Mesh(new THREE.ConeGeometry(2.5, 12, 8), new THREE.MeshLambertMaterial({ color: 0xff7043 })); nose.rotation.z = -Math.PI/2; nose.position.set(15, 77, 0); g.add(nose);
       g.position.set(s[0], 0, s[1]); g.rotation.y = R()*6; shadows(g, true, false); addW(g); }
+    // houten hutjes met sneeuw op het dak en licht achter het raam
+    const cabinWood = new THREE.MeshLambertMaterial({ color: 0x6d4c41 }), cabinWin = new THREE.MeshBasicMaterial({ color: 0xffd54f });
+    for (let q = 0; q < 7; q++){ const s = randomSpot(90); if (!s) continue; const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(70, 40, 56), cabinWood); body.position.y = 20; g.add(body);
+      for (const sd of [-1, 1]){ const rf = new THREE.Mesh(new THREE.BoxGeometry(80, 5, 40), kit.snow); rf.position.set(0, 50, sd*14); rf.rotation.x = -sd*0.62; g.add(rf); }
+      const chim = new THREE.Mesh(new THREE.BoxGeometry(9, 26, 9), new THREE.MeshLambertMaterial({ color: 0x5d4037 })); chim.position.set(20, 58, 8); g.add(chim);
+      for (const x of [-18, 18]){ const w = new THREE.Mesh(new THREE.BoxGeometry(13, 12, 1), cabinWin); w.position.set(x, 22, 28.5); g.add(w); }
+      g.position.set(s[0], 0, s[1]); g.rotation.y = R()*6; shadows(g, true, true); addW(g);
+      const cx = s[0] + 20, cz = s[1]; let st = R(); worldAnims.push((t, dt) => { st -= dt; if (st <= 0){ st = 0.5; emit(cx, 78, cz, 6, 22, 4, 3, 10, 40, 0xdddddd, 0.35); } });
+    }
   }
   if (TR.theme === 'night'){
     // lantaarns langs de baan
@@ -694,7 +819,8 @@ function buildTrack(k){
     for (let i = 0; i < N; i += 12){ const p = P(i); if (p.gap || p.bridge) continue; const s = (i/12)%2 ? 1 : -1;
       const g = onTrack(i, s*(WALL+18), 0); const pole = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 80, 6), poleMat); pole.position.y = 40; g.add(pole);
       const lamp = new THREE.Mesh(lampGeo, lampMat); lamp.position.y = 82; g.add(lamp);
-      const glow = new THREE.Sprite(glowMat); glow.scale.set(70, 70, 1); glow.position.y = 82; g.add(glow); pole.castShadow = true; }
+      const glow = new THREE.Sprite(glowMat); glow.scale.set(70, 70, 1); glow.position.y = 82; g.add(glow); pole.castShadow = true;
+      const ph = R()*6; worldAnims.push(t => glow.scale.setScalar(64 + Math.sin(t*9 + ph)*4 + Math.sin(t*23 + ph)*3)); }   // flakkerend licht
     // kasteel in de linker lus
     let best = null, bd = 0;
     for (let q = 0; q < 400; q++){ const x = minX + R()*(maxX-minX)*0.5, y = minY + R()*(maxY-minY); let d = 1e9;
@@ -729,9 +855,83 @@ function buildTrack(k){
     glow.scale.set(vr*1.2, vr*0.8, 1); glow.position.set(CX, vh + 40, CZ); addW(glow);
     volcanoTop = { x: CX, y: vh, z: CZ };
     // lavameren en lava onder de sprong
-    for (let q = 0; q < 10; q++){ const s = randomSpot(60); if (!s) continue; const pool = new THREE.Mesh(new THREE.CircleGeometry(60 + R()*120, 24), lavaMat); flat(pool); pool.position.set(s[0], 0.9, s[1]); addW(pool); }
+    const pools = [];
+    for (let q = 0; q < 10; q++){ const s = randomSpot(60); if (!s) continue; const pool = new THREE.Mesh(new THREE.CircleGeometry(60 + R()*120, 24), lavaMat); flat(pool); pool.position.set(s[0], 0.9, s[1]); addW(pool); pools.push(s); }
+    // lavafonteinen: gloeiende vonken die omhoog spuiten
+    let ft = 0;
+    if (pools.length) worldAnims.push((t, dt) => { ft -= dt; if (ft > 0) return; ft = 0.07;
+      const pl = pools[Math.floor(Math.random()*pools.length)];
+      emit(pl[0] + (Math.random()-.5)*60, 6, pl[1] + (Math.random()-.5)*60, (Math.random()-.5)*50, 140 + Math.random()*140, (Math.random()-.5)*50, 1.3, 9, 3, Math.random() < .5 ? 0xff6d00 : 0xffab00, 0.95); });
     for (let i = 0; i < N; i++) if (P(i).gap && !P(i-1).gap){
       const g = onTrack(i+1, 0, 0); g.position.y = 0.9; g.add(flat(new THREE.Mesh(new THREE.PlaneGeometry(140, 2*WALL+140), lavaMat))); }
+  }
+  if (TR.theme === 'city'){
+    // gebouwen met verlichte ramen (de ramen geven zelf licht)
+    const winTex = canvasTex(64, 128, (g,w,h) => { g.fillStyle = '#151724'; g.fillRect(0,0,w,h); const r2 = rng(5);
+      for (let y = 6; y < h; y += 16) for (let x = 5; x < w; x += 14){ const on = r2() < 0.55; g.fillStyle = on ? (r2() < .7 ? '#ffe9a8' : '#9fd8ff') : '#232638'; g.fillRect(x, y, 8, 10); } });
+    winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping;
+    const bMat = new THREE.MeshStandardMaterial({ map: winTex, emissive: 0xffffff, emissiveMap: winTex, emissiveIntensity: 0.85, roughness: .8 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x22242e, roughness: .9 });
+    const building = (w, h, d) => {
+      const geo = new THREE.BoxGeometry(w, h, d), uv = geo.attributes.uv;
+      for (let fc = 0; fc < 6; fc++){ const fw = fc < 2 ? d : w, fh = (fc === 2 || fc === 3) ? d : h;
+        for (let v = 0; v < 4; v++){ const k = fc*4 + v; uv.setXY(k, uv.getX(k)*fw/56, uv.getY(k)*fh/64); } }
+      return new THREE.Mesh(geo, [bMat, bMat, roofMat, roofMat, bMat, bMat]);
+    };
+    const neon = ['ARCADE', 'PIZZA', 'HOTEL', 'TURBO', 'NEON', 'SUSHI', 'CINEMA', 'KARTS'], neonCol = ['#ff4081', '#18ffff', '#ffea00', '#76ff03', '#e040fb', '#ff9100'];
+    let placed = 0;
+    for (let q = 0; q < 900 && placed < 85; q++){
+      const x = B.x0 - 300 + R()*(B.x1-B.x0+600), y = B.y0 - 300 + R()*(B.y1-B.y0+600), w = 80 + R()*120, d = 80 + R()*120, h = 120 + R()*R()*520;
+      if (!roadClear(x, y, Math.max(w, d)*0.72) || Math.hypot(x-STAND.x, y-STAND.z) < 420 || (PIT && Math.hypot(x-PIT.x, y-PIT.z) < 320)) continue;
+      const b = building(w, h, d); b.position.set(x, h/2, y); b.rotation.y = Math.floor(R()*4)*Math.PI/2; b.castShadow = b.receiveShadow = true; addW(b); placed++;
+      if (R() < 0.45){
+        const txt = neon[Math.floor(R()*neon.length)], col = neonCol[Math.floor(R()*neonCol.length)];
+        const tex = canvasTex(256, 64, (g,cw,ch) => { g.font = '900 44px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.shadowColor = col; g.shadowBlur = 14; g.fillStyle = col; g.fillText(txt, cw/2, ch/2+2); g.shadowBlur = 0; g.fillStyle = '#fff'; g.globalAlpha = .6; g.fillText(txt, cw/2, ch/2+2); });
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w*0.9, 120), 30), new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }));
+        sign.position.set(0, Math.min(h*0.5, 90) - h/2 + 30, d/2 + 1.5); b.add(sign);
+        const ph = R()*6; worldAnims.push(t => { sign.material.opacity = Math.sin(t*3 + ph) > -0.92 ? 1 : 0.3; });
+      }
+    }
+    // skyline in de verte
+    const ringR2 = Math.max(maxX-minX, maxY-minY)/2 + 2600;
+    for (let q = 0; q < 46; q++){ const a = q/46*Math.PI*2, r = ringR2 + R()*1500, w = 160 + R()*220, h = 400 + R()*1300;
+      const b = building(w, h, w); b.position.set(CX + Math.cos(a)*r, h/2, CZ + Math.sin(a)*r); addW(b); }
+    // straatlantaarns
+    const lampMat2 = new THREE.MeshBasicMaterial({ color: 0xfff3c4 }), poleMat2 = new THREE.MeshLambertMaterial({ color: 0x37474f });
+    const glowMat2 = new THREE.SpriteMaterial({ map: puffTex, color: 0xfff0c0, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let i = 0; i < N; i += 10){ const p = P(i); if (p.gap || p.bridge || p.tunnel) continue; const sd = (i/10)%2 ? 1 : -1;
+      const g = onTrack(i, sd*(WALL+16), 0);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 90, 6), poleMat2); pole.position.y = 45; g.add(pole);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 30), poleMat2); arm.position.set(0, 90, -sd*14); g.add(arm);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 14), lampMat2); lamp.position.set(0, 87, -sd*26); g.add(lamp);
+      const glow = new THREE.Sprite(glowMat2); glow.scale.set(60, 60, 1); glow.position.set(0, 86, -sd*26); g.add(glow); pole.castShadow = true; }
+    const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0xe1d9ff, fog: false, depthWrite: false }));
+    moon.scale.set(2200, 2200, 1); moon.position.set(CX + 8000, 6000, CZ - 14000); addW(moon);
+  }
+  if (TR.theme === 'desert'){
+    const sandRock = new THREE.MeshStandardMaterial({ color: 0xb5652b, roughness: 1, flatShading: true });
+    // rotsbogen over de weg
+    for (const f of TR.arches || []){
+      const i = idxOf(f), g = onTrack(i, 0, 0);
+      for (const sd of [-1, 1]){ const pil = new THREE.Mesh(new THREE.CylinderGeometry(26, 42, 160, 7), sandRock); pil.position.set(0, 80, sd*(WALL+44)); g.add(pil); }
+      const top = new THREE.Mesh(new THREE.BoxGeometry(80, 56, 2*WALL+150), sandRock); top.position.y = 172; g.add(top);
+      const top2 = new THREE.Mesh(new THREE.DodecahedronGeometry(60, 0), sandRock); top2.scale.set(1, 0.6, 2.2); top2.position.y = 205; g.add(top2);
+      shadows(g);
+    }
+    // donkere kloof onder de sprong
+    const chasm = new THREE.MeshBasicMaterial({ color: 0x2a1408 });
+    for (let i = 0; i < N; i++) if (P(i).gap && !P(i-1).gap){ const g = onTrack(i+1, 0, 0); g.position.y = 0.6; g.add(flat(new THREE.Mesh(new THREE.PlaneGeometry(150, 2*WALL+500), chasm))); }
+    // tafelbergen (mesa's) in de buurt
+    for (let q = 0; q < 9; q++){ const s = randomSpot(180); if (!s) continue; const w = 90 + R()*130, h = 120 + R()*220;
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(w*0.75, w, h, 8), sandRock); m.position.set(s[0], h/2, s[1]); m.castShadow = true; addW(m); }
+    // rollende tumbleweeds (dorre struikbollen)
+    const twMat = new THREE.MeshLambertMaterial({ color: 0x8d6e3f, wireframe: true });
+    for (let q = 0; q < 6; q++){ const s = randomSpot(40); if (!s) continue;
+      const tw = new THREE.Mesh(new THREE.IcosahedronGeometry(11, 1), twMat); tw.position.set(s[0], 11, s[1]); addW(tw);
+      const sp = 25 + R()*25, ph = R()*6, x0 = s[0];
+      worldAnims.push((t, dt) => { tw.position.x = x0 + Math.sin(t*0.15 + ph)*260; tw.position.y = 11 + Math.abs(Math.sin(t*3 + ph))*8; tw.rotation.z -= sp*dt/11; });
+    }
   }
   weather.visible = !!TH.weather;
   if (TH.weather){ weatherMat.color.setHex(TH.weather === 'snow' ? 0xffffff : 0xff8a50); weatherMat.size = TH.weather === 'snow' ? 7 : 5;
@@ -904,7 +1104,7 @@ const VEHICLES = {
   kart: { name: 'Kart', icon: '🏎️', desc: 'Stevig, duwt anderen weg', top: 1, acc: 1, turn: 1, mass: 1 },
   bike: { name: 'Motor', icon: '🏍️', desc: 'Wendbaar en snel weg, maar licht', top: 0.97, acc: 1.08, turn: 1.12, mass: 0.7 },
 };
-const AI_BIKES = new Set([1, 4]);   // Luna en Rico rijden als computerspeler op een motor
+const AI_BIKES = new Set([1, 4, 8]);   // Luna, Rico en Jesse rijden als computerspeler op een motor
 let vehicle = 'kart'; try { if (localStorage.getItem('turbokarts_vehicle') === 'bike') vehicle = 'bike'; } catch(e){}
 function makeCar(d, ai, skill, gridIdx, side, veh = 'kart'){
   const V = VEHICLES[veh] || VEHICLES.kart;
@@ -925,12 +1125,18 @@ function clearRace(){
 }
 let firstFin = null;
 const isCup = () => mode === 'cup' || (mode === 'online' && net.sub === 'cup');
+const CUPS = [
+  { name: 'Zon Cup', emoji: '☀️', tracks: [0, 1, 5] },
+  { name: 'Nacht Cup', emoji: '🌙', tracks: [2, 4, 3] },
+];
+let cupSel = 0;
+const cupTracks = () => CUPS[cupSel].tracks;
 function setupRace(){
   clearRace(); firstFin = null;
   const humans = net.role ? net.roster : [{ id: 'local', d: selected }];
-  const used = new Set(humans.map(h => h.d)), ais = DRIVERS.map((_, i) => i).filter(i => !used.has(i));
-  const skills = [0.97, 0.95, 0.93, 0.91, 0.89];
-  const grid = [[N-2,-48],[N-2,48],[N-5,-48],[N-5,48],[N-8,-48],[N-8,48]];
+  const used = new Set(humans.map(h => h.d)), ais = DRIVERS.map((_, i) => i).filter(i => !used.has(i)).slice(0, Math.max(0, RACE_SIZE - humans.length));
+  const skills = [0.97, 0.955, 0.94, 0.925, 0.91, 0.895, 0.88];
+  const grid = [[N-2,-58],[N-2,58],[N-5,-58],[N-5,58],[N-8,-58],[N-8,58],[N-11,-58],[N-11,58]];
   cars = [];
   ais.forEach((di, i) => cars.push(makeCar(DRIVERS[di], true, skills[i], grid[i][0], grid[i][1], AI_BIKES.has(di) ? 'bike' : 'kart')));
   humans.forEach((h, i) => { const g = grid[ais.length + i], c = makeCar(DRIVERS[h.d], false, 0.9, g[0], g[1], h.v || (net.role ? 'kart' : vehicle)); c.owner = h.id; c.itemSeen = 0; cars.push(c); });
@@ -942,18 +1148,18 @@ function raceUI(){
   for (const id of ['menu','results','podium']) $(id).hidden = true; document.body.classList.add('racing');
   $('hud').hidden = false; $('big').textContent = '';
   showMsg('Tip: geef gas als de 1 verschijnt voor een 🚀 raketstart'); msgT = 3;
-  $('trackname').textContent = (isCup() ? '🏆 Race ' + (cupIdx+1) + '/4 · ' : '🏁 ') + TR.emoji + ' ' + TR.name + (net.role ? ' · 🌐 online' : '');
+  $('trackname').textContent = (isCup() ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name + ' ' + (cupIdx+1) + '/' + cupTracks().length + ' · ' : '🏁 ') + TR.emoji + ' ' + TR.name + (net.role ? ' · 🌐 online' : '');
 }
 function startRace(){
   if (net.role === 'client') return;
-  initAudio(); const k = isCup() ? cupIdx : menuTrack; loadTrack(k); setupRace(); state = 'countdown'; cd = 3.5; lastCount = -1;
+  initAudio(); const k = isCup() ? cupTracks()[cupIdx] : menuTrack; loadTrack(k); setupRace(); state = 'countdown'; cd = 3.5; lastCount = -1;
   raceUI();
-  if (net.role === 'host') broadcast({ t:'start', k, cup: isCup(), cupIdx, roster: net.roster, pts: cupPts });
+  if (net.role === 'host') broadcast({ t:'start', k, cup: isCup(), cupIdx, cs: cupSel, roster: net.roster, pts: cupPts });
 }
-function startCup(){ cupIdx = 0; cupPts = {}; for (const d of DRIVERS) cupPts[d.name] = 0; startRace(); }
+function startCup(){ cupIdx = 0; cupPts = {}; startRace(); }
 function toMenu(){
   state = 'menu'; document.body.classList.remove('racing'); for (const id of ['results','podium','hud']) $(id).hidden = true; $('menu').hidden = false; $('big').textContent = '';
-  loadTrack(isCup() ? 0 : menuTrack); setupRace(); buildMenu();
+  loadTrack(isCup() ? cupTracks()[0] : menuTrack); setupRace(); buildMenu();
   if (net.role === 'host'){ broadcast({ t:'menu' }); sendLobby(); }
 }
 
@@ -963,7 +1169,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let slickId = 0;
 const netStatus = t => $('onStatus').textContent = t;
 function broadcast(m){ for (const c of net.conns) if (c.open) c.send(m); }
-function sendLobby(){ broadcast({ t:'lobby', roster: net.roster, code: net.code, sub: net.sub, track: menuTrack }); }
+function sendLobby(){ broadcast({ t:'lobby', roster: net.roster, code: net.code, sub: net.sub, track: menuTrack, cs: cupSel }); }
 function setDriver(id, d){
   if (net.roster.some(r => r.d === d && r.id !== id)) return false;
   const r = net.roster.find(r => r.id === id); if (r) r.d = d;
@@ -982,7 +1188,7 @@ function hostGame(){
   peer.on('error', e => { if (e.type === 'unavailable-id'){ peer.destroy(); hostGame(); } else if (!net.role) netStatus('Er ging iets mis: ' + e.type); });
   peer.on('connection', conn => {
     conn.on('open', () => {
-      if (state !== 'menu' || net.roster.length >= DRIVERS.length){ conn.send({ t:'full' }); setTimeout(() => conn.close(), 400); return; }
+      if (state !== 'menu' || net.roster.length >= RACE_SIZE){ conn.send({ t:'full' }); setTimeout(() => conn.close(), 400); return; }
       net.conns.push(conn);
       const used = new Set(net.roster.map(r => r.d));
       net.roster.push({ id: conn.peer, d: DRIVERS.findIndex((_, i) => !used.has(i)), v: 'kart' });
@@ -1030,12 +1236,12 @@ function hostOnMsg(conn, m){
 function clientOnMsg(m){
   if (m.t === 'full'){ leaveOnline('Dit spel is vol of de race is al bezig'); return; }
   if (m.t === 'lobby'){
-    net.roster = m.roster; net.sub = m.sub; menuTrack = m.track;
+    net.roster = m.roster; net.sub = m.sub; menuTrack = m.track; cupSel = m.cs || 0;
     const me = m.roster.find(r => r.id === net.myId); if (me){ selected = me.d; if (me.v) vehicle = me.v; }
-    if (state === 'menu'){ loadTrack(isCup() ? 0 : menuTrack); setupRace(); buildMenu(); }
+    if (state === 'menu'){ loadTrack(isCup() ? cupTracks()[0] : menuTrack); setupRace(); buildMenu(); }
   }
   if (m.t === 'start'){
-    initAudio(); net.roster = m.roster; net.sub = m.cup ? 'cup' : 'single'; cupIdx = m.cupIdx; menuTrack = m.k; cupPts = m.pts || {};
+    initAudio(); net.roster = m.roster; net.sub = m.cup ? 'cup' : 'single'; cupIdx = m.cupIdx; cupSel = m.cs || 0; menuTrack = m.k; cupPts = m.pts || {};
     net.slickSig = ''; loadTrack(m.k); setupRace(); state = 'countdown'; cd = 3.5; lastCount = -1; raceUI();
   }
   if (m.t === 's' && state !== 'menu' && state !== 'podium') net.snap = m;
@@ -1153,13 +1359,22 @@ function buildMenu(){
     $('onCode').innerHTML = 'Spelcode:<b>' + net.code + '</b>' + (net.role === 'host' ? '<br><small>Geef deze code aan je vrienden, zij kiezen "Meedoen"</small>' : '');
     $('onPlayers').innerHTML = net.roster.map(r => { const d = DRIVERS[r.d] || DRIVERS[0];
       return `<span class="pl" style="border:2px solid ${d.css}">${d.face} ${d.name} ${(VEHICLES[r.v] || VEHICLES.kart).icon}${r.id === 'host' ? ' 👑' : ''}${r.id === net.myId ? ' (jij)' : ''}</span>`; }).join('')
-      + `<span class="pl" style="opacity:.7">+ ${DRIVERS.length - net.roster.length} computer</span>`;
+      + `<span class="pl" style="opacity:.7">+ ${RACE_SIZE - net.roster.length} computer</span>`;
     $('onHostOpts').hidden = net.role !== 'host'; $('onWait').hidden = net.role !== 'client';
-    if (net.role === 'client') $('onWait').textContent = 'Wachten tot de host start… (' + (net.sub === 'cup' ? '🏆 kampioenschap' : '🏁 ' + TRACKS[menuTrack].name) + ')';
+    if (net.role === 'client') $('onWait').textContent = 'Wachten tot de host start… (' + (net.sub === 'cup' ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name : '🏁 ' + TRACKS[menuTrack].name) + ')';
     document.querySelectorAll('#subModes .mode').forEach(b => b.classList.toggle('sel', b.dataset.s === net.sub));
   }
   updateInvite();
-  const tb = $('tracks'); tb.hidden = !(mode === 'single' || (on && net.role === 'host' && net.sub === 'single')); tb.innerHTML = '';
+  const tb = $('tracks'); tb.innerHTML = '';
+  const showCups = mode === 'cup' || (on && net.role === 'host' && net.sub === 'cup');
+  tb.hidden = !(showCups || mode === 'single' || (on && net.role === 'host' && net.sub === 'single'));
+  if (showCups) CUPS.forEach((cp, i) => {
+    const el = document.createElement('div'); el.className = 'card tcard cupcard' + (i === cupSel ? ' sel' : '');
+    el.innerHTML = '<div class="em">' + cp.emoji + '</div><b>' + cp.name + '</b><div class="rec">' + cp.tracks.map(t => TRACKS[t].emoji + ' ' + TRACKS[t].name).join('<br>') + '</div>';
+    el.onclick = () => { cupSel = i; loadTrack(cupTracks()[0]); setupRace(); buildMenu(); if (net.role === 'host') sendLobby(); };
+    tb.appendChild(el);
+  });
+  else
   TRACKS.forEach((t, i) => {
     let rec = null; try { rec = parseFloat(localStorage.getItem('turbokarts_best_' + t.id)) || null; } catch(e){}
     const el = document.createElement('div'); el.className = 'card tcard' + (i === menuTrack ? ' sel' : '');
@@ -1236,9 +1451,9 @@ function chooseDriver(i){
 }
 document.querySelectorAll('#modes .mode').forEach(b => b.onclick = () => {
   if (net.role && b.dataset.m !== 'online') leaveOnline();
-  mode = b.dataset.m; loadTrack(isCup() ? 0 : menuTrack); setupRace(); buildMenu();
+  mode = b.dataset.m; loadTrack(isCup() ? cupTracks()[0] : menuTrack); setupRace(); buildMenu();
 });
-document.querySelectorAll('#subModes .mode').forEach(b => b.onclick = () => { net.sub = b.dataset.s; loadTrack(isCup() ? 0 : menuTrack); setupRace(); buildMenu(); sendLobby(); });
+document.querySelectorAll('#subModes .mode').forEach(b => b.onclick = () => { net.sub = b.dataset.s; loadTrack(isCup() ? cupTracks()[0] : menuTrack); setupRace(); buildMenu(); sendLobby(); });
 $('hostBtn').onclick = hostGame; $('joinBtn').onclick = joinGame; $('leaveBtn').onclick = () => leaveOnline();
 $('codeIn').addEventListener('keydown', e => { e.stopPropagation(); if (e.code === 'Enter') joinGame(); });
 $('startBtn').onclick = () => { if (net.role === 'client' || (mode === 'online' && !net.role)) return; isCup() ? startCup() : startRace(); };
@@ -1248,7 +1463,7 @@ $('podMenuBtn').onclick = () => net.role === 'client' ? toMenu() : toMenu();
 $('nextBtn').onclick = () => {
   if (net.role === 'client') return;
   cupIdx++;
-  if (cupIdx < TRACKS.length) startRace();
+  if (cupIdx < cupTracks().length) startRace();
   else { if (net.role === 'host') broadcast({ t:'podium', pts: cupPts }); startPodium(); }
 };
 
@@ -1487,7 +1702,7 @@ function respawn(c){
   let delta = i - c.idx; if (delta > N/2) delta -= N; if (delta < -N/2) delta += N; c.total += delta; c.idx = i;
   const p = P(i), d = dir(i);
   Object.assign(c, { x: p.x, y: p.y, z: p.h, h: Math.atan2(d.y, d.x), vx:0, vy:0, vf:0, vr:0, vz:0, air:false, spinT:0, spinA:0, drifting:false, boostT:0, slope:0 });
-  if (c === player){ sfx.splash(); showMsg(TR.theme === 'lava' ? '🔥 Oei, in de lava!' : 'Oeps! Teruggezet'); shake = 0.6; camH = c.h; }
+  if (c === player){ sfx.splash(); showMsg(TR.theme === 'lava' ? '🔥 Oei, in de lava!' : TR.theme === 'desert' ? '🕳️ Oeps, in de kloof!' : 'Oeps! Teruggezet'); shake = 0.6; camH = c.h; }
 }
 
 function trackProgress(c){
@@ -1540,7 +1755,7 @@ function endRace(){
 function row(c, i, right){ return `<div class="row ${c.name === player.name ? 'me' : ''}"><span>${i+1}.</span><span class="dot" style="background:${c.css}"></span>${c.face} ${c.name}<span class="t">${right}</span></div>`; }
 function showResults(){
   const order = ranking(), cup = isCup();
-  if (cup) order.forEach((c, i) => cupPts[c.name] += POINTS[i]);
+  if (cup) order.forEach((c, i) => cupPts[c.name] = (cupPts[c.name] || 0) + POINTS[i]);
   const data = { t:'results', order: order.map(c => c.name), times: order.map(c => c.finished ? r2(c.finishTime) : null), cup, cupIdx, pts: cupPts };
   if (net.role === 'host') broadcast(data);
   renderResults(data);
@@ -1550,16 +1765,17 @@ function renderResults(data){
   const order = data.order.map(n => cars.find(c => c.name === n)).filter(Boolean), place = data.order.indexOf(player.name) + 1;
   if (net.role === 'client'){ cupPts = data.pts; cupIdx = data.cupIdx; }
   $('resTitle').textContent = place === 1 ? '🏆 GEWONNEN!' : place <= 3 ? 'Podium! Plek ' + place : 'Plek ' + place;
-  $('resSub').textContent = (data.cup ? 'Race ' + (data.cupIdx+1) + '/4 · ' : '') + TR.emoji + ' ' + TR.name + ' · jouw beste ronde ' + fmt(player.best);
+  $('resSub').textContent = (data.cup ? CUPS[cupSel].name + ' ' + (data.cupIdx+1) + '/' + cupTracks().length + ' · ' : '') + TR.emoji + ' ' + TR.name + ' · jouw beste ronde ' + fmt(player.best);
   $('resList').innerHTML = order.map((c, i) => row(c, i, (data.times[i] != null ? fmt(data.times[i]) : 'rijdt nog…') + (data.cup ? `<span class="pts">+${POINTS[i]}</span>` : ''))).join('');
   $('standWrap').hidden = !data.cup;
   if (data.cup){
-    const st = [...DRIVERS].sort((a, b) => cupPts[b.name] - cupPts[a.name]);
+    const st = DRIVERS.filter(d => d.name in cupPts).sort((a, b) => cupPts[b.name] - cupPts[a.name]);
     $('standList').innerHTML = st.map((d, i) => row(d, i, cupPts[d.name] + ' pnt')).join('');
   }
   const boss = net.role !== 'client';
   $('nextBtn').hidden = !(data.cup && boss); $('againBtn').hidden = data.cup || !boss; $('resWait').hidden = boss;
-  $('nextBtn').textContent = data.cupIdx < TRACKS.length-1 ? 'Volgende race: ' + TRACKS[data.cupIdx+1].emoji + ' ' + TRACKS[data.cupIdx+1].name + ' ▶' : 'Naar de prijsuitreiking 🏆';
+  const nextT = TRACKS[cupTracks()[data.cupIdx+1]];
+  $('nextBtn').textContent = nextT ? 'Volgende race: ' + nextT.emoji + ' ' + nextT.name + ' ▶' : 'Naar de prijsuitreiking 🏆';
   $('menuBtn').textContent = net.role === 'client' ? 'Verlaten' : data.cup ? 'Stoppen' : 'Menu';
   $('results').hidden = false;
 }
@@ -1570,7 +1786,7 @@ function startPodium(){
   state = 'podium'; podiumT = 0; document.body.classList.remove('racing');
   for (const id of ['results','hud']) $(id).hidden = true;
   for (const b of balls) scene.remove(b.m); balls = [];
-  const st = [...DRIVERS].sort((a, b) => cupPts[b.name] - cupPts[a.name]);
+  const st = DRIVERS.filter(d => d.name in cupPts).sort((a, b) => cupPts[b.name] - cupPts[a.name]);
   const PI0 = 4, p = P(PI0), d = dir(PI0), n = { x: -d.y, y: d.x };
   const spots = [[0, 40], [-52, 26], [52, 14]];
   const gold = new THREE.MeshStandardMaterial({ color: 0xffc107, metalness: 0.3, roughness: 0.3, emissive: 0x6b4a00, side: THREE.DoubleSide });
@@ -1664,6 +1880,7 @@ function update(dt){
   if (volcanoTop){ smokeT -= dt; if (smokeT <= 0){ smokeT = 0.18;
     emit(volcanoTop.x + (Math.random()-.5)*60, volcanoTop.y, volcanoTop.z + (Math.random()-.5)*60, (Math.random()-.5)*30, 70 + Math.random()*40, (Math.random()-.5)*30, 5, 90, 320, Math.random() < .3 ? 0x6d4c41 : 0x555555, 0.55); } }
   updateParticles(dt); updateWeather(dt);
+  for (const fn of worldAnims) fn(simT, dt);
   if (state === 'menu') return;
   if (state === 'podium'){
     podiumT += dt;
