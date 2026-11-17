@@ -367,6 +367,9 @@ const TRACKS = [
   { id:'jungle', name:'Jungletempel', emoji:'🌴', theme:'jungle',
     ctrl:[[500,1700,0],[1500,1750,0],[2300,1650,10],[2700,1250,30],[2500,800,55],[2900,450,70],[2300,250,70],[1700,450,50],[1300,850,30],[900,600,20],[450,450,10],[250,950,0],[300,1400,0]],
     boxes:[0.8,4.5,9.6], pads:[1.25,7.4], jumps:[{at:1.55, gap:true},{at:8.5}], tunnels:[[5.4,6.4]], ice:[], arches:[3.4, 10.5] },
+  { id:'haven', name:'Havenbrug', emoji:'🌉', theme:'harbor',
+    ctrl:[[2900,600,0],[2900,1400,0],[2450,1700,0],[1950,1450,0],[1500,1050,0],[1050,650,0],[600,450,20],[250,800,55],[300,1350,90],[700,1650,110],[1100,1450,115],[1500,1050,120],[1950,650,100],[2450,350,55],[2750,350,20]],
+    boxes:[0.6,5.5,12.6], pads:[0.3,5.25], jumps:[], tunnels:[], ice:[], water:[[8.15,10.6]] },
 ];
 const THEMES = {
   beach:{ sky:['#2a8be0','#8cc8f2','#e9f4fb'], fog:[0xe9f4fb,3000,12000], hemi:[0xe8f4ff,0xc8b88a,0.7], sun:[0xfff3dd,1.0],
@@ -393,6 +396,9 @@ const THEMES = {
   jungle:{ sky:['#4f9fd6','#a6d4ec','#d4ead8'], fog:[0xc9e2cf,1400,7500], hemi:[0xeaffea,0x3d5a2a,0.78], sun:[0xfff2d0,0.85],
     ground:['#3f7a35','#356b2d','#4a8a3f','#2f5f28'], runoff:0x6b5a3a, wallA:0x6d4c41, wallB:0xa1887f, curbA:0x2e7d32, curbB:0xffeb3b,
     mount:0x3f6b3a, snowcap:false, trees:'jungle', weather:'rain', grip:0.95 },
+  harbor:{ sky:['#3a86d6','#9cccf0','#e6f2f8'], fog:[0xe3eef6,3000,12500], hemi:[0xeaf4ff,0x6a7a6a,0.72], sun:[0xfff3dd,1.0],
+    ground:['#7d8a6a','#6f7d5e','#8a977a','#5f6b52'], runoff:0x9a9a96, wallA:0x1565c0, wallB:0xeeeeee, curbA:0x1565c0, curbB:0xffffff,
+    mount:0x6f8d6c, snowcap:false, trees:'park', weather:null, grip:1 },
 };
 
 // ================= Renderer, licht, lucht =================
@@ -457,7 +463,7 @@ const metal = new THREE.MeshStandardMaterial({ color: 0xd0d4d8, metalness: 0.6, 
 
 // ================= Baan-gegevens (worden per baan opnieuw gevuld) =================
 let TR, TH, PTS = [], N = 0, DIST = [], B, CX = 0, CZ = 0, minX, minY, maxX, maxY;
-let worldAnims = [];
+let worldAnims = [], WATERBOX = null;
 let pads = [], boxes = [], world = null, currentTrack = -1, volcanoTop = null, bestEver = null;
 const P = i => PTS[((i%N)+N)%N];
 function dir(i){ const a = P(i), b = P(i+1), dx = b.x-a.x, dy = b.y-a.y, l = Math.hypot(dx,dy) || 1; return {x:dx/l, y:dy/l}; }
@@ -576,6 +582,11 @@ function buildTrack(k){
   }
   for (const [a,b] of TR.tunnels) range(a, b, p => p.tunnel = true);
   for (const [a,b] of TR.ice) range(a, b, p => p.ice = true);
+  for (const [a,b] of TR.water || []) range(a, b, p => { p.bridge = true; p.water = true; });
+  // gebied van het water (voor het waterplan en om er geen bomen in te zetten)
+  WATERBOX = null;
+  { const wp = PTS.filter(p => p.water); if (wp.length){ const xs = wp.map(p => p.x), ys = wp.map(p => p.y);
+    WATERBOX = { x0: Math.min(...xs) - 260, x1: Math.max(...xs) + 260, y0: Math.min(...ys) - 260, y1: Math.max(...ys) + 260 }; } }
   DIST = [0]; for (let i = 1; i <= N; i++) DIST.push(DIST[i-1] + Math.hypot(P(i).x-P(i-1).x, P(i).y-P(i-1).y));
   // bruggen: hoog stuk boven een ander (laag) stuk van de baan
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++){
@@ -614,13 +625,13 @@ function buildTrack(k){
       const a = hash(xi, yi), b = hash(xi+1, yi), c = hash(xi, yi+1), d = hash(xi+1, yi+1); return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v; };
     const fbm = (x, y) => { let s = 0, a = 0.5, f = 1; for (let o = 0; o < 5; o++){ s += a*vnoise(x*f, y*f); f *= 2.03; a *= 0.5; } return s; };
     const smooth = (a, b, x) => { const t = clamp((x-a)/(b-a), 0, 1); return t*t*(3-2*t); };
-    const MT = { beach: 1000, snow: 2300, night: 900, lava: 1500, desert: 420, city: 0, gp: 650, jungle: 1600 }[TR.theme] ?? 1000;
+    const MT = { beach: 1000, snow: 2300, night: 900, lava: 1500, desert: 420, city: 0, gp: 650, jungle: 1600, harbor: 700 }[TR.theme] ?? 1000;
     const TS = 30000, SEG = IS_TOUCH ? 110 : 160;
     const tg = new THREE.PlaneGeometry(TS, TS, SEG, SEG); tg.rotateX(-Math.PI/2);
     const pos = tg.attributes.position, col = new Float32Array(pos.count*3);
     const sample = PTS.filter((_, i) => i % 4 === 0);
     const cBase = new THREE.Color(TH.ground[0]), cDark = new THREE.Color(TH.ground[3]);
-    const cRock = new THREE.Color(({ desert: 0xa65a2a, lava: 0x2a201d, night: 0x2b3040, snow: 0x8a8f96, beach: 0x6f7a62, gp: 0x6f7a62, jungle: 0x46573c })[TR.theme] || 0x777a72);
+    const cRock = new THREE.Color(({ desert: 0xa65a2a, lava: 0x2a201d, night: 0x2b3040, snow: 0x8a8f96, beach: 0x6f7a62, gp: 0x6f7a62, jungle: 0x46573c, harbor: 0x6f7a62 })[TR.theme] || 0x777a72);
     const cSnow = new THREE.Color(0xf4f7fb), c = new THREE.Color();
     const snowy = TR.theme === 'snow' || TR.theme === 'beach';
     for (let v = 0; v < pos.count; v++){
@@ -690,17 +701,52 @@ function buildTrack(k){
   const notBridge = i => !(P(i).bridge && P(i+1).bridge);
   strip(-(WALL+10), -12, WALL+10, -12, deckMat, null, notBridge);
   for (const s of [1, -1]) strip(s*(WALL+10), 0, s*(WALL+10), -12, deckMat, null, notBridge);
-  const pillarGeo = new THREE.BoxGeometry(18, 1, 18);
-  for (let i = 0; i < N; i += 4){
-    const p = P(i); if (!p.bridge) continue; const n = nrm(i);
-    for (const lat of [-ROAD/2+10, ROAD/2-10]){
-      const x = p.x + n.x*lat, z = p.y + n.y*lat;
-      let blocked = false;
-      for (let j = 0; j < N; j++){ const di = Math.min(Math.abs(i-j), N-Math.abs(i-j)); if (di > 30 && Math.hypot(PTS[j].x-x, PTS[j].y-z) < WALL+14){ blocked = true; break; } }
-      if (blocked) continue;
-      const pl = new THREE.Mesh(pillarGeo, deckMat); pl.scale.y = p.h - 12; pl.position.set(x, (p.h-12)/2, z); pl.castShadow = true; addW(pl);
+  // --- mooiere bruggen: ronde pijlers met dwarsbalk, lantaarns en bij lange bruggen een hangbrug ---
+  const bridgeDeco = new THREE.Group(); addW(bridgeDeco);
+  const pierMat = new THREE.MeshStandardMaterial({ color: 0xb3aea5, roughness: 0.85 });
+  const towerMat = new THREE.MeshStandardMaterial({ color: TR.theme === 'night' ? 0x5a4a6a : 0xc62828, roughness: 0.5, metalness: 0.3 });
+  const cableMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, metalness: 0.6, roughness: 0.3 });
+  const lampMatB = new THREE.MeshBasicMaterial({ color: 0xfff2c0 }), lampPole = new THREE.MeshStandardMaterial({ color: 0x455a64, roughness: 0.5 });
+  // staat hier een ander (lager) stuk van de baan? dan geen pijler of toren
+  const blockedAt = (i, x, z, r) => { for (let j = 0; j < N; j += 2){ const di = Math.min(Math.abs(i-j), N-Math.abs(i-j)); if (di > 30 && Math.hypot(PTS[j].x-x, PTS[j].y-z) < r) return true; } return false; };
+  for (let i = 0; i < N; i += 5){
+    const p = P(i); if (!p.bridge || p.h < 20) continue; const n = nrm(i), H = p.h - 12; let placed = 0;
+    for (const lat of [-ROAD/2 + 18, ROAD/2 - 18]){
+      const x = p.x + n.x*lat, z = p.y + n.y*lat; if (blockedAt(i, x, z, WALL + 16)) continue;
+      const pl = new THREE.Mesh(G('pier' + Math.round(H), () => new THREE.CylinderGeometry(7, 10, H, 16)), pierMat); pl.position.set(x, H/2, z); bridgeDeco.add(pl); placed++;
+    }
+    if (placed === 2){ const g = new THREE.Group(); const q = P(i), dd = dir(i); g.position.set(q.x, q.h - 18, q.y); g.rotation.y = -Math.atan2(dd.y, dd.x); g.add(new THREE.Mesh(rbox(16, 10, ROAD - 20, 3), pierMat)); bridgeDeco.add(g); }
+  }
+  for (let i = 0; i < N; i += 8){   // lantaarns op de brug
+    const p = P(i); if (!p.bridge) continue; const n = nrm(i), sd = (i/8) % 2 ? 1 : -1, x = p.x + n.x*sd*(WALL + 5), z = p.y + n.y*sd*(WALL + 5);
+    limb3(bridgeDeco, lampPole, 1.4, 1.1, [x, p.h + 20, z], [x, p.h + 62, z]);
+    const lamp = new THREE.Mesh(rbox(8, 3, 8, 1), lampMatB); lamp.position.set(x - n.x*sd*3, p.h + 63, z - n.y*sd*3); bridgeDeco.add(lamp);
+  }
+  // hangbrug: torens en kabels boven lange bruggen
+  const runs = []; { let st = -1; for (let i = 0; i <= N; i++){ const b = i < N && P(i).bridge; if (b && st < 0) st = i; if (!b && st >= 0){ runs.push([st, i - 1]); st = -1; } } }
+  for (const [a, b] of runs){
+    const len = b - a; if (len < 24) continue;
+    const side = WALL + 16;
+    const legsAt = ti => [-1, 1].map(s => { const p = P(ti), n = nrm(ti); return { ti, s, x: p.x + n.x*s*side, z: p.y + n.y*s*side, top: p.h + 125 }; });
+    const free = ti => legsAt(ti).every(L => !blockedAt(ti, L.x, L.z, WALL + 10));
+    // torens op een vrije plek: vanaf de uiteinden naar het midden zoeken
+    let t1 = a + Math.round(len*0.15), t2 = b - Math.round(len*0.15);
+    while (t1 < t2 && !free(t1)) t1++;
+    while (t2 > t1 && !free(t2)) t2--;
+    if (t2 - t1 < 22) continue;
+    const legs = [...legsAt(t1), ...legsAt(t2)];
+    for (const L of legs) limb3(bridgeDeco, towerMat, 7, 5, [L.x, 0, L.z], [L.x, L.top, L.z]);
+    for (const ti of [t1, t2]){ const [A, B2] = legs.filter(L => L.ti === ti); for (const hgt of [P(ti).h + 40, A.top - 8]) limb3(bridgeDeco, towerMat, 3.5, 3.5, [A.x, hgt, A.z], [B2.x, hgt, B2.z]); }
+    for (const s of [-1, 1]){
+      const cableY = i => { const top = P(t1).h + 120, low = P(Math.round((t1 + t2)/2)).h + 26, u = (i - (t1 + t2)/2)/((t2 - t1)/2); return low + (top - low)*u*u; };
+      const at = (i, y) => { const p = P(i), n = nrm(i); return [p.x + n.x*s*side, y, p.y + n.y*s*side]; };
+      for (let i = t1; i < t2; i += 3){ const j = Math.min(t2, i + 3);
+        limb3(bridgeDeco, cableMat, 0.9, 0.9, at(i, cableY(i)), at(j, cableY(j)));                 // hoofdkabel
+        if (i > t1) limb3(bridgeDeco, cableMat, 0.35, 0.35, at(i, P(i).h + 20), at(i, cableY(i))); }   // hangers
+      for (const [from, to] of [[t1, a + 1], [t2, b - 1]]) limb3(bridgeDeco, cableMat, 0.9, 0.9, at(from, P(from).h + 120), at(to, P(to).h + 22));   // ankerkabels
     }
   }
+  bakeStatic(bridgeDeco); shadows(bridgeDeco, true, true);
   // tunnels
   const tunMat = new THREE.MeshStandardMaterial({ color: 0x5d5550, roughness: 0.95, side: THREE.DoubleSide });
   const rockMat = new THREE.MeshStandardMaterial({ color: ({ snow: 0x8a8f96, city: 0x55585f, desert: 0xa0522d, jungle: 0x5b6a4a })[TR.theme] || 0x3b2f2a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
@@ -970,6 +1016,7 @@ function buildTrack(k){
     if (TR.theme === 'beach' && y > maxY + 260) continue;
     if (PIT && Math.hypot(x-PIT.x, y-PIT.z) < 300) continue;
     if (noTree.some(o => Math.hypot(x-o.x, y-o.z) < 260)) continue;
+    if (WATERBOX && x > WATERBOX.x0 && x < WATERBOX.x1 && y > WATERBOX.y0 && y < WATERBOX.y1) continue;
     const t = makeTree(TR.theme === 'desert' && R() < 0.3 ? 'rock' : TH.trees); t.position.set(x, 0, y); forest.add(t); n++;
   }
   bakeStatic(forest); shadows(forest, true, false);   // alle bomen samen: veel sneller te tekenen
@@ -1183,6 +1230,46 @@ function buildTrack(k){
       const pil = new THREE.Mesh(G('ruinpil', () => new THREE.CylinderGeometry(9, 10, 70, 12)), q % 3 ? moss : mossDark);
       if (q % 2){ pil.rotation.z = Math.PI/2; pil.position.set(sp[0], 9, sp[1]); pil.rotation.y = R()*6; } else pil.position.set(sp[0], 35 - R()*25, sp[1]);
       pil.castShadow = true; addW(pil); }
+  }
+  if (TR.theme === 'harbor'){
+    const WB = WATERBOX;
+    if (WB){
+      // het water onder de hangbrug
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(WB.x1 - WB.x0, WB.y1 - WB.y0), new THREE.MeshStandardMaterial({ color: 0x1f6f9a, metalness: 0.35, roughness: 0.12, transparent: true, opacity: 0.94 }));
+      flat(water); water.position.set((WB.x0 + WB.x1)/2, 0.6, (WB.y0 + WB.y1)/2); water.receiveShadow = true; addW(water);
+      // kademuur rondom
+      const quay = new THREE.MeshStandardMaterial({ color: 0x9e9a92, roughness: 0.9 });
+      for (const [cx, cz, w, d] of [[(WB.x0+WB.x1)/2, WB.y0, WB.x1-WB.x0, 12], [(WB.x0+WB.x1)/2, WB.y1, WB.x1-WB.x0, 12], [WB.x0, (WB.y0+WB.y1)/2, 12, WB.y1-WB.y0], [WB.x1, (WB.y0+WB.y1)/2, 12, WB.y1-WB.y0]]){
+        const q = new THREE.Mesh(new THREE.BoxGeometry(w, 8, d), quay); q.position.set(cx, 4, cz); addW(q); }
+      // bootjes die op het water deinen
+      for (let q = 0; q < 5; q++){
+        const b = new THREE.Group(), hull = new THREE.Mesh(rbox(70, 12, 24, 5), new THREE.MeshStandardMaterial({ color: [0xffffff, 0xd32f2f, 0x1565c0][q%3], roughness: .5 })); hull.position.y = 5; b.add(hull);
+        const cab = new THREE.Mesh(rbox(26, 14, 18, 3), new THREE.MeshStandardMaterial({ color: 0xeeeeee })); cab.position.set(-8, 17, 0); b.add(cab);
+        b.position.set(WB.x0 + 120 + R()*(WB.x1 - WB.x0 - 240), 1, WB.y0 + 120 + R()*(WB.y1 - WB.y0 - 240)); b.rotation.y = R()*6; addW(b);
+        const ph = R()*6; worldAnims.push(t => { b.position.y = 1 + Math.sin(t*1.4 + ph)*1.8; b.rotation.z = Math.sin(t*1.1 + ph)*0.05; });
+      }
+      // havenkranen aan de rand van het water
+      const craneMat = new THREE.MeshStandardMaterial({ color: 0xffb300, roughness: 0.5, metalness: 0.3 });
+      for (const [cx, cz] of [[WB.x0 + 60, WB.y1 + 160], [WB.x1 - 60, WB.y1 + 160]]){
+        if (!roadClear(cx, cz, 60)) continue;
+        const g = new THREE.Group();
+        for (const [lx, lz] of [[-30, -30], [30, -30], [-30, 30], [30, 30]]) limb3(g, craneMat, 3, 3, [lx, 0, lz], [lx*0.6, 170, lz*0.6]);
+        const top = new THREE.Mesh(rbox(50, 14, 50, 3), craneMat); top.position.y = 177; g.add(top);
+        const boom = new THREE.Mesh(rbox(12, 10, 300, 3), craneMat); boom.position.set(0, 186, -130); g.add(boom);
+        const cab = new THREE.Mesh(rbox(20, 16, 16, 3), new THREE.MeshStandardMaterial({ color: 0xeeeeee })); cab.position.set(0, 160, -20); g.add(cab);
+        g.position.set(cx, 0, cz); shadows(g); addW(g); noTree.push({ x: cx, z: cz });
+      }
+    }
+    // stapels zeecontainers
+    const cCols = [0xc62828, 0x1565c0, 0x2e7d32, 0xef6c00, 0x78909c, 0x6a1b9a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, metalness: 0.2 }));
+    const yard = new THREE.Group(); addW(yard);
+    for (let q = 0; q < 16; q++){
+      const sp = randomSpot(70); if (!sp) continue;
+      if (WB && sp[0] > WB.x0 && sp[0] < WB.x1 && sp[1] > WB.y0 && sp[1] < WB.y1) continue;
+      const rot = R() < 0.5 ? 0 : Math.PI/2, high = 1 + Math.floor(R()*3);
+      for (let l = 0; l < high; l++){ const c = new THREE.Mesh(rbox(60, 25, 24, 1.2), cCols[Math.floor(R()*cCols.length)]); c.position.set(sp[0], 12.5 + l*25.5, sp[1]); c.rotation.y = rot + (R()-.5)*0.08; yard.add(c); }
+    }
+    bakeStatic(yard); shadows(yard, true, true);
   }
   if (TR.theme === 'gp'){
     // grote tribune aan de overkant van het rechte stuk en een groot scherm
@@ -1626,6 +1713,7 @@ const CUPS = [
   { name: 'Zon Cup', emoji: '☀️', tracks: [0, 1, 5] },
   { name: 'Nacht Cup', emoji: '🌙', tracks: [2, 4, 3] },
   { name: 'Natuur Cup', emoji: '🌿', tracks: [6, 7, 0] },
+  { name: 'Bruggen Cup', emoji: '🌉', tracks: [8, 2, 3] },
 ];
 let cupSel = 0;
 // niveaus van de computerspelers (bots)
