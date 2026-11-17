@@ -48,6 +48,8 @@
   .card.sel{border-color:#ffeb3b;background:#00000099;transform:scale(1.05)}
   .face{width:54px;height:54px;border-radius:50%;margin:0 auto 6px;border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:30px}
   .card b{display:block;font-size:17px}
+  .card .cls{font-size:11px;font-weight:800;opacity:.85}
+  .card .spec{font-size:10px;line-height:1.3;margin-top:5px;color:#ffe082;font-weight:700}
   .card .rec{font-size:11px;opacity:.85;margin-top:3px}
   .tcard{width:140px}
   .tcard .em{font-size:40px}
@@ -204,6 +206,7 @@
   </div>
 </div>
 <div id="rotate" class="shadow">🔄 Draai je telefoon liggend voor een groter beeld</div>
+<div id="flash" style="position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s;z-index:5"></div>
 <div id="big" class="shadow"></div>
 <div id="msg" class="shadow"></div>
 
@@ -318,19 +321,21 @@ const $ = id => document.getElementById(id);
 function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
+// Coureurs: gewichtsklasse (licht/middel/zwaar) en een eigen specialiteit
+const CLASSES = { licht: { name: 'Licht', icon: '🪶', mass: 0.82, look: [0.94, 0.9] }, middel: { name: 'Middel', icon: '⚖️', mass: 1, look: [1, 1] }, zwaar: { name: 'Zwaar', icon: '🏋️', mass: 1.3, look: [1.07, 1.2] } };
 const DRIVERS = [
-  { name:'Max',   color:0xe53935, css:'#e53935', face:'😎', top:1.00, acc:1.00, turn:1.00 },
-  { name:'Luna',  color:0x8e24aa, css:'#8e24aa', face:'🦄', top:0.97, acc:1.12, turn:1.08 },
-  { name:'Bram',  color:0xfbc02d, css:'#fbc02d', face:'🐻', top:1.05, acc:0.88, turn:0.92 },
-  { name:'Zoë',   color:0x1e88e5, css:'#1e88e5', face:'🦊', top:0.98, acc:1.05, turn:1.10 },
-  { name:'Rico',  color:0x43a047, css:'#43a047', face:'🐸', top:1.03, acc:0.95, turn:0.95 },
-  { name:'Fenna', color:0xec407a, css:'#ec407a', face:'🐱', top:0.96, acc:1.15, turn:1.05 },
-  { name:'Noah',  color:0xff6d00, css:'#ff6d00', face:'🦁', top:1.04, acc:0.92, turn:0.96 },
-  { name:'Sara',  color:0x00bfa5, css:'#00bfa5', face:'🐼', top:0.99, acc:1.06, turn:1.04 },
-  { name:'Jesse', color:0x546e7a, css:'#546e7a', face:'🐺', top:1.06, acc:0.86, turn:0.94 },
-  { name:'Mila',  color:0xc6ff00, css:'#aeea00', face:'🐰', top:0.95, acc:1.18, turn:1.08 },
-  { name:'Daan',  color:0xeceff1, css:'#cfd8dc', face:'🐨', top:1.02, acc:0.98, turn:1.00 },
-  { name:'Lotte', color:0x8d6e63, css:'#8d6e63', face:'🦉', top:0.97, acc:1.10, turn:1.06 },
+  { name:'Rocco', color:0xe53935, css:'#e53935', face:'🦊', cls:'middel', top:1.00, acc:1.00, turn:1.00, special:'rocket',       desc:'Allrounder. Raketstart lukt bijna altijd' },
+  { name:'Nova',  color:0x8e24aa, css:'#8e24aa', face:'🦄', cls:'licht',  top:0.97, acc:1.12, turn:1.10, special:'longShield',   desc:'Schild houdt twee keer zo lang' },
+  { name:'Bruno', color:0xfbc02d, css:'#fbc02d', face:'🐻', cls:'zwaar',  top:1.06, acc:0.86, turn:0.90, special:'heavyPush',    desc:'Duwt iedereen opzij' },
+  { name:'Zippy', color:0x1e88e5, css:'#1e88e5', face:'🐝', cls:'licht',  top:0.97, acc:1.10, turn:1.12, special:'driftPro',     desc:'Laadt drift-turbo sneller op' },
+  { name:'Tito',  color:0x43a047, css:'#43a047', face:'🐸', cls:'licht',  top:0.98, acc:1.08, turn:1.06, special:'offroad',      desc:'Racet moeiteloos door gras en zand' },
+  { name:'Mimi',  color:0xec407a, css:'#ec407a', face:'🐱', cls:'middel', top:0.99, acc:1.08, turn:1.04, special:'ballItems',    desc:'Krijgt vaker knalballen' },
+  { name:'Draco', color:0xff6d00, css:'#ff6d00', face:'🐲', cls:'zwaar',  top:1.07, acc:0.88, turn:0.93, special:'longTurbo',    desc:'Turbo\'s duren langer' },
+  { name:'Kiki',  color:0x00bfa5, css:'#00bfa5', face:'🦜', cls:'licht',  top:0.96, acc:1.14, turn:1.08, special:'quickRecover', desc:'Staat snel weer recht na een klap' },
+  { name:'Rex',   color:0x546e7a, css:'#546e7a', face:'🦖', cls:'zwaar',  top:1.08, acc:0.84, turn:0.92, special:'wallTough',    desc:'Kan tegen een stootje (muren)' },
+  { name:'Blitz', color:0xc6ff00, css:'#aeea00', face:'🐆', cls:'middel', top:1.03, acc:0.96, turn:0.98, special:'draft',        desc:'Meester in slipstream' },
+  { name:'Pip',   color:0xeceff1, css:'#cfd8dc', face:'🐭', cls:'licht',  top:0.95, acc:1.18, turn:1.10, special:'turboItems',   desc:'Krijgt vaker turbo\'s' },
+  { name:'Gorgo', color:0x8d6e63, css:'#8d6e63', face:'🦍', cls:'zwaar',  top:1.05, acc:0.90, turn:0.94, special:'shieldStart',  desc:'Start elke race met een schild' },
 ];
 const ITEMS = {
   turbo:  { icon:'🚀', name:'Turbo' },
@@ -338,6 +343,11 @@ const ITEMS = {
   olie:   { icon:'🛢️', name:'Olievlek' },
   bal:    { icon:'🔴', name:'Knalbal' },
   schild: { icon:'🛡️', name:'Schild' },
+  bom:      { icon:'💣', name:'Bom' },
+  bliksem:  { icon:'⚡', name:'Bliksem' },
+  magneet:  { icon:'🧲', name:'Magneet' },
+  spook:    { icon:'👻', name:'Spook' },
+  kopjager: { icon:'🎯', name:'Kopjager' },
 };
 
 // ================= Banen =================
@@ -345,19 +355,19 @@ const ITEMS = {
 const TRACKS = [
   { id:'strand', name:'Zonnestrand', emoji:'🏖️', theme:'beach',
     ctrl:[[400,1600,0],[400,600,0],[700,300,0],[1200,350,25],[1400,700,55],[1800,800,35],[2200,450,10],[2700,600,0],[2800,1100,0],[2400,1400,30],[1900,1300,55],[1500,1650,25],[900,1800,0]],
-    boxes:[1.2,6.5,10.5], pads:[0.5,7.5,11.25], jumps:[{at:11.65}], tunnels:[], ice:[] },
+    boxes:[1.2,6.5,10.5], pads:[0.5,7.5,11.25], jumps:[{at:11.65}], tunnels:[], ice:[], viaduct:[[3.3,5.6],[9.3,11.2]] },
   { id:'ijs', name:'IJspiek', emoji:'❄️', theme:'snow',
     ctrl:[[500,1700,0],[1500,1750,0],[2300,1650,0],[2800,1300,25],[2850,800,65],[2500,400,115],[1900,300,150],[1400,500,150],[1100,900,110],[700,800,75],[350,500,40],[200,1000,10],[250,1450,0]],
-    boxes:[0.75,4.3,9.6], pads:[0.3,10.5], jumps:[{at:1.5}], tunnels:[[5.45,7.35]], ice:[[2.3,2.9],[8.2,8.8],[11.1,11.7]] },
+    boxes:[0.75,4.3,9.6], pads:[0.3,10.5], jumps:[{at:1.5}], tunnels:[[5.45,7.35]], ice:[[2.3,2.9],[8.2,8.8],[11.1,11.7]], viaduct:[[3.2,5.3],[7.6,9.5]] },
   { id:'kasteel', name:'Spookkasteel', emoji:'🏰', theme:'night',
     ctrl:[[2850,700,0],[2850,1400,0],[2400,1650,0],[1950,1400,0],[1500,1000,0],[1050,600,0],[600,450,20],[250,800,40],[300,1350,55],[700,1600,70],[1100,1400,85],[1500,1000,95],[2000,600,75],[2500,500,30]],
     boxes:[0.7,6.5,12.5], pads:[0.3,5.3,9.5], jumps:[{at:5.6}], tunnels:[], ice:[] },
   { id:'vulkaan', name:'Vulkaanberg', emoji:'🌋', theme:'lava',
     ctrl:[[600,1650,0],[1600,1750,0],[2400,1600,10],[2850,1150,40],[2700,600,70],[2200,350,95],[1600,450,95],[1200,800,60],[800,600,40],[400,700,20],[250,1200,0]],
-    boxes:[1.6,4.5,8.5], pads:[0.35], jumps:[{at:0.62, gap:true},{at:2.4}], tunnels:[[5.2,6.6]], ice:[] },
+    boxes:[1.6,4.5,8.5], pads:[0.35], jumps:[{at:0.62, gap:true},{at:2.4}], tunnels:[[5.2,6.6]], ice:[], viaduct:[[3.2,5.0,'lava']] },
   { id:'stad', name:'Neonstad', emoji:'🏙️', theme:'city',
     ctrl:[[500,1700,0],[1500,1720,0],[2250,1680,0],[2750,1450,10],[2850,950,30],[2600,500,50],[2000,350,60],[1500,600,60],[1300,1100,30],[900,1080,10],[500,750,0],[300,1150,0]],
-    boxes:[0.8,5.6,9.5], pads:[0.3,3.3,8.3], jumps:[{at:1.55}], tunnels:[[6.2,7.4]], ice:[] },
+    boxes:[0.8,5.6,9.5], pads:[0.3,3.3,8.3], jumps:[{at:1.55}], tunnels:[[6.2,7.4]], ice:[], viaduct:[[4.2,6.0],[7.6,8.6]] },
   { id:'woestijn', name:'Woestijncanyon', emoji:'🏜️', theme:'desert',
     ctrl:[[600,1700,0],[1600,1750,0],[2400,1600,15],[2800,1100,40],[2600,600,60],[2000,450,60],[1700,800,40],[1300,500,30],[800,400,15],[350,700,0],[300,1250,0]],
     boxes:[0.7,4.5,9.5], pads:[1.2,6.4], jumps:[{at:1.5, gap:true},{at:5.5}], tunnels:[[7.25,8.35]], ice:[], arches:[3.5, 9.6] },
@@ -366,7 +376,7 @@ const TRACKS = [
     boxes:[1.3,7.5,12.4], pads:[0.5,10.5], jumps:[], tunnels:[], ice:[] },
   { id:'jungle', name:'Jungletempel', emoji:'🌴', theme:'jungle',
     ctrl:[[500,1700,0],[1500,1750,0],[2300,1650,10],[2700,1250,30],[2500,800,55],[2900,450,70],[2300,250,70],[1700,450,50],[1300,850,30],[900,600,20],[450,450,10],[250,950,0],[300,1400,0]],
-    boxes:[0.8,4.5,9.6], pads:[1.25,7.4], jumps:[{at:1.55, gap:true},{at:8.5}], tunnels:[[5.4,6.4]], ice:[], arches:[3.4, 10.5] },
+    boxes:[0.8,4.5,9.6], pads:[1.25,7.4], jumps:[{at:1.55, gap:true},{at:8.5}], tunnels:[[5.4,6.4]], ice:[], arches:[3.4, 10.5], viaduct:[[3.7,5.3,'water']] },
   { id:'haven', name:'Havenbrug', emoji:'🌉', theme:'harbor',
     ctrl:[[2900,600,0],[2900,1400,0],[2450,1700,0],[1950,1450,0],[1500,1050,0],[1050,650,0],[600,450,20],[250,800,55],[300,1350,90],[700,1650,110],[1100,1450,115],[1500,1050,120],[1950,650,100],[2450,350,55],[2750,350,20]],
     boxes:[0.6,5.5,12.6], pads:[0.3,5.25], jumps:[], tunnels:[], ice:[], water:[[8.15,10.6]] },
@@ -463,7 +473,7 @@ const metal = new THREE.MeshStandardMaterial({ color: 0xd0d4d8, metalness: 0.6, 
 
 // ================= Baan-gegevens (worden per baan opnieuw gevuld) =================
 let TR, TH, PTS = [], N = 0, DIST = [], B, CX = 0, CZ = 0, minX, minY, maxX, maxY;
-let worldAnims = [], WATERBOX = null;
+let worldAnims = [], WATERBOX = null, LIQBOXES = [];
 let pads = [], boxes = [], world = null, currentTrack = -1, volcanoTop = null, bestEver = null;
 const P = i => PTS[((i%N)+N)%N];
 function dir(i){ const a = P(i), b = P(i+1), dx = b.x-a.x, dy = b.y-a.y, l = Math.hypot(dx,dy) || 1; return {x:dx/l, y:dy/l}; }
@@ -583,6 +593,11 @@ function buildTrack(k){
   for (const [a,b] of TR.tunnels) range(a, b, p => p.tunnel = true);
   for (const [a,b] of TR.ice) range(a, b, p => p.ice = true);
   for (const [a,b] of TR.water || []) range(a, b, p => { p.bridge = true; p.water = true; });
+  for (const [a,b,liq] of TR.viaduct || []) range(a, b, p => { p.bridge = true; if (liq) p.liquid = liq; });   // viaduct op pijlers
+  // rivier of lava onder een viaduct
+  LIQBOXES = [];
+  for (const liq of ['water', 'lava']){ const lp = PTS.filter(p => p.liquid === liq); if (!lp.length) continue; const xs = lp.map(p => p.x), ys = lp.map(p => p.y);
+    LIQBOXES.push({ liq, x0: Math.min(...xs) - 220, x1: Math.max(...xs) + 220, y0: Math.min(...ys) - 220, y1: Math.max(...ys) + 220 }); }
   // gebied van het water (voor het waterplan en om er geen bomen in te zetten)
   WATERBOX = null;
   { const wp = PTS.filter(p => p.water); if (wp.length){ const xs = wp.map(p => p.x), ys = wp.map(p => p.y);
@@ -1017,6 +1032,7 @@ function buildTrack(k){
     if (PIT && Math.hypot(x-PIT.x, y-PIT.z) < 300) continue;
     if (noTree.some(o => Math.hypot(x-o.x, y-o.z) < 260)) continue;
     if (WATERBOX && x > WATERBOX.x0 && x < WATERBOX.x1 && y > WATERBOX.y0 && y < WATERBOX.y1) continue;
+    if (LIQBOXES.some(L => x > L.x0 && x < L.x1 && y > L.y0 && y < L.y1)) continue;
     const t = makeTree(TR.theme === 'desert' && R() < 0.3 ? 'rock' : TH.trees); t.position.set(x, 0, y); forest.add(t); n++;
   }
   bakeStatic(forest); shadows(forest, true, false);   // alle bomen samen: veel sneller te tekenen
@@ -1231,6 +1247,10 @@ function buildTrack(k){
       if (q % 2){ pil.rotation.z = Math.PI/2; pil.position.set(sp[0], 9, sp[1]); pil.rotation.y = R()*6; } else pil.position.set(sp[0], 35 - R()*25, sp[1]);
       pil.castShadow = true; addW(pil); }
   }
+  for (const L of LIQBOXES){   // rivier of lava onder het viaduct
+    const mat = L.liq === 'lava' ? (() => { const m = new THREE.MeshBasicMaterial({ map: lavaTex }); m.map.keep = true; return m; })() : new THREE.MeshStandardMaterial({ color: 0x2f7d8c, metalness: 0.3, roughness: 0.15, transparent: true, opacity: 0.92 });
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(L.x1 - L.x0, L.y1 - L.y0), mat); flat(pl); pl.position.set((L.x0 + L.x1)/2, 0.6, (L.y0 + L.y1)/2); pl.receiveShadow = true; addW(pl);
+  }
   if (TR.theme === 'harbor'){
     const WB = WATERBOX;
     if (WB){
@@ -1442,6 +1462,7 @@ function torsoBlock(parent, mat, a, b, w, d, extras){
   return g;
 }
 function makeDriver(parent, d, suit, P){
+  { const lk = (CLASSES[d.cls] || CLASSES.middel).look, dg = new THREE.Group(); dg.scale.set(1, lk[0], lk[1]); parent.add(dg); parent = dg; }
   const di = Math.max(0, DRIVERS.findIndex(x => x.name === d.name));
   const skin = new THREE.MeshStandardMaterial({ color: SKINS[(di*5 + 1) % SKINS.length], roughness: 0.6 });
   const hairMat = new THREE.MeshStandardMaterial({ color: HAIR_COLS[(di*3 + 2) % HAIR_COLS.length], roughness: 0.75 });
@@ -1688,11 +1709,13 @@ const VEHICLES = {
   hatch:   { name: 'Hot hatch',    icon: '🚗', desc: 'Sportieve stadsauto, vlot en stabiel', top: 1.0, acc: 1.03, turn: 0.98, mass: 1.3, off: 1.0, grip: 1.08, aero: 0.9 },
   gt:      { name: 'GT-sportwagen', icon: '🏎️', desc: 'Laag, breed en heel snel', top: 1.06, acc: 1.0, turn: 0.95, mass: 1.25, off: 0.85, grip: 1.18, aero: 0.8 },
 };
-const AI_VEH = { 1: 'bike', 4: 'bike', 8: 'bike', 11: 'bike', 2: 'buggy', 10: 'buggy', 6: 'formula', 9: 'formula', 3: 'hatch', 7: 'hatch', 5: 'gt' };   // wat de bots rijden   // Luna, Rico en Jesse rijden als computerspeler op een motor
+const AI_VEH = { 1: 'bike', 3: 'bike', 7: 'bike', 4: 'buggy', 11: 'buggy', 6: 'formula', 9: 'formula', 5: 'hatch', 10: 'hatch', 8: 'gt' };   // wat de bots rijden   // wat de bots rijden   // Luna, Rico en Jesse rijden als computerspeler op een motor
 let vehicle = 'kart'; try { const sv = localStorage.getItem('turbokarts_vehicle'); if (sv in VEHICLES) vehicle = sv; } catch(e){}
 function makeCar(d, ai, skill, gridIdx, side, veh = 'kart'){
   const V = VEHICLES[veh] || VEHICLES.kart;
-  d = { ...d, top: d.top*V.top, acc: d.acc*V.acc, turn: d.turn*V.turn, vehicle: veh, mass: V.mass, offroad: V.off, gripMul: V.grip || 1, aero: V.aero ?? 0.95 };
+  const CL = CLASSES[d.cls] || CLASSES.middel;
+  d = { ...d, top: d.top*V.top, acc: d.acc*V.acc, turn: d.turn*V.turn, vehicle: veh, mass: V.mass*CL.mass*(d.special === 'heavyPush' ? 1.25 : 1),
+    offroad: V.off*(d.special === 'offroad' ? 1.5 : 1), gripMul: V.grip || 1, aero: V.aero ?? 0.95 };
   const dd = dir(gridIdx), p = P(gridIdx);
   return { ...d, ai, skill, x: p.x - dd.y*side, y: p.y + dd.x*side, z: p.h, vz: 0, air: false, slope: 0, slopeVis: 0,
     h: Math.atan2(dd.y, dd.x), vx:0, vy:0, vf:0, vr:0, steerSm:0,
@@ -1884,8 +1907,8 @@ function makeSnap(){
   return { t:'s', st: state, cd: r2(cd), rt: r2(raceTime),
     c: cars.map(c => [r2(c.x), r2(c.y), r2(c.z), r2(c.h), r2(c.vx), r2(c.vy), r2(c.vf), r2(c.vr), r2(c.steerSm), r2(c.roll), r2(c.pitch), r2(c.slopeVis),
       r2(c.boostT), r2(c.spinT), r2(c.spinA), r2(c.shieldT), r2(c.hopT), c.drifting ? 1 : 0, c.driftDir, r2(c.charge), c.air ? 1 : 0, r2(c.dist), c.idx, c.total,
-      c.maxFloor, c.finished ? 1 : 0, r2(c.finishTime), c.best == null ? -1 : r2(c.best), c.lastLap == null ? -1 : r2(c.lastLap), c.item || '', c.itemCount, r2(c.rollT), c.ai ? 1 : 0]),
-    b: balls.map(b => [r2(b.m.position.x), r2(b.m.position.y), r2(b.m.position.z)]),
+      c.maxFloor, c.finished ? 1 : 0, r2(c.finishTime), c.best == null ? -1 : r2(c.best), c.lastLap == null ? -1 : r2(c.lastLap), c.item || '', c.itemCount, r2(c.rollT), c.ai ? 1 : 0, r2(c.ghostT || 0)]),
+    b: balls.map(b => [r2(b.m.position.x), r2(b.m.position.y), r2(b.m.position.z), b.kind === 'bom' ? 1 : b.kind === 'kop' ? 2 : 0]),
     o: slicks.map(s => [s.id, r2(s.x), r2(s.y), r2(s.z)]),
     x: boxes.map(b => b.g.visible ? 1 : 0).join('') };
 }
@@ -1918,11 +1941,12 @@ function clientUpdate(dt){
       [c.tx, c.ty, c.tz, c.th, c.vx, c.vy, c.vf, c.vr, c.steerSm, c.roll, c.pitch, c.slopeVis, c.boostT, c.spinT, c.spinA, c.shieldT, c.hopT] = a;
       c.drifting = !!a[17]; c.driftDir = a[18]; c.charge = a[19]; c.air = !!a[20]; c.dist = a[21]; c.idx = a[22]; c.total = a[23]; c.maxFloor = a[24];
       c.finished = !!a[25]; c.finishTime = a[26]; c.best = a[27] < 0 ? null : a[27]; c.lastLap = a[28] < 0 ? null : a[28];
-      c.item = a[29] || null; c.itemCount = a[30]; c.rollT = a[31]; c.ai = !!a[32];
+      c.item = a[29] || null; c.itemCount = a[30]; c.rollT = a[31]; c.ai = !!a[32]; c.ghostT = a[33] || 0;
       if (!c.hasNet){ c.x = c.tx; c.y = c.ty; c.z = c.tz; c.h = c.th; c.hasNet = true; }
       if (c === player) clientEvents(c, prev);
     });
-    while (balls.length < s.b.length){ const m = new THREE.Mesh(new THREE.SphereGeometry(11, 18, 14), new THREE.MeshStandardMaterial({ color: 0xff1744, emissive: 0x550000 })); scene.add(m); balls.push({ m }); }
+    const kinds = ['bal', 'bom', 'kop'];
+    s.b.forEach((b, i) => { const kd = kinds[b[3] || 0]; if (balls[i] && balls[i].kind !== kd){ scene.remove(balls[i].m); balls[i] = null; } if (!balls[i]){ const m = projMesh(kd); scene.add(m); balls[i] = { m, kind: kd }; } });
     while (balls.length > s.b.length) scene.remove(balls.pop().m);
     s.b.forEach((b, i) => balls[i].m.position.set(b[0], b[1], b[2]));
     const sig = s.o.map(o => o[0]).join(',');
@@ -1970,7 +1994,9 @@ function buildMenu(){
     const taken = net.role && net.roster.some(r => r.d === i && r.id !== net.myId);
     const el = document.createElement('div'); el.className = 'card' + (i === selected ? ' sel' : '') + (taken ? ' taken' : '');
     const bar = (label, v) => `<div class="stat"><span>${label}</span><div class="bar"><i style="width:${clamp((v-0.85)/0.32,0.1,1)*100}%"></i></div></div>`;
-    el.innerHTML = `<div class="face" style="background:${d.css}">${d.face}</div><b>${d.name}</b>${taken ? '<div class="tk">bezet</div>' : ''}${bar('Snelheid', d.top*1.1)}${bar('Optrek', d.acc)}${bar('Sturen', d.turn)}`;
+    const CL = CLASSES[d.cls] || CLASSES.middel;
+    el.title = d.desc;
+    el.innerHTML = `<div class="face" style="background:${d.css}">${d.face}</div><b>${d.name}</b><div class="cls">${CL.icon} ${CL.name}</div>${taken ? '<div class="tk">bezet</div>' : ''}${bar('Snelheid', d.top*1.1)}${bar('Optrek', d.acc)}${bar('Sturen', d.turn)}${bar('Gewicht', 0.85 + (CL.mass - 0.8)*0.62)}<div class="spec">⭐ ${d.desc}</div>`;
     el.onclick = () => chooseDriver(i);
     box.appendChild(el);
   });
@@ -2267,18 +2293,42 @@ function aiInput(c, t){
 // ================= Items =================
 function pickItem(c){
   const r = RANK.indexOf(c) / (cars.length-1);
-  const table = r < 0.25 ? { olie:40, bal:25, schild:30, turbo:5 }
-              : r > 0.7  ? { turbo3:40, turbo:30, bal:25, schild:5 }
-              :            { turbo:30, bal:30, olie:20, schild:10, turbo3:10 };
+  const table = r < 0.25 ? { olie:30, bal:22, schild:24, bom:20, turbo:4 }
+              : r > 0.7  ? { turbo3:22, turbo:12, magneet:18, kopjager:10, bliksem:12, spook:12, bal:14 }
+              :            { turbo:20, bal:22, olie:14, schild:8, turbo3:8, bom:14, magneet:8, spook:6 };
+  if (c.special === 'turboItems'){ for (const k of ['turbo', 'turbo3']) if (table[k]) table[k] *= 1.8; }
+  if (c.special === 'ballItems' && table.bal) table.bal *= 2;
   let sum = 0; for (const k in table) sum += table[k];
   let x = Math.random()*sum; for (const k in table){ x -= table[k]; if (x <= 0) return k; } return 'turbo';
 }
-function boost(c, t){ c.boostT = Math.max(c.boostT, t); if (c === player) sfx.boost(); }
+function boost(c, t){ if (c.special === 'longTurbo') t *= 1.35; c.boostT = Math.max(c.boostT, t); if (c === player) sfx.boost(); }
+function flash(){ const el = $('flash'); if (!el) return; el.style.opacity = 0.85; setTimeout(() => el.style.opacity = 0, 90); }
+// ontploffing: iedereen binnen de straal gaat spinnen
+function explode(x, y, z, radius){
+  for (let i = 0; i < 26; i++) emit(x, y + 8, z, (Math.random()-.5)*360, 60 + Math.random()*180, (Math.random()-.5)*360, 0.8 + Math.random()*0.4, 14, 60, i % 3 ? 0xff9100 : 0x555555, 0.9, 120);
+  if (player && Math.hypot(player.x - x, player.y - z) < 700){ beep(70, .5, 'sawtooth', .14, -40); shake = Math.max(shake, 0.7); }
+  for (const c of cars) if (Math.abs(c.z - y) < 45 && Math.hypot(c.x - x, c.y - z) < radius) hitKart(c, 1.2);
+}
 function useItem(c){
   if (!c.item || c.rollT > 0 || c.spinT > 0) return;
   const it = c.item, fx = Math.cos(c.h), fy = Math.sin(c.h);
   if (it === 'turbo' || it === 'turbo3') boost(c, 1.4);
-  if (it === 'schild') c.shieldT = 8;
+  if (it === 'schild') c.shieldT = c.special === 'longShield' ? 16 : 8;
+  if (it === 'spook'){ c.ghostT = 4; if (c === player) beep(600, .5, 'sine', .07, -300); }
+  if (it === 'magneet'){ c.magnetT = 2.4; boost(c, 2.0); }
+  if (it === 'bliksem'){
+    const my = RANK.indexOf(c);
+    for (const o of cars) if (o !== c && RANK.indexOf(o) < my){ hitKart(o, 0.7); o.vx *= 0.55; o.vy *= 0.55; notify(o, '⚡ Bliksem!'); }
+    if (c === player || RANK.indexOf(player) < my) flash();
+    beep(1400, .35, 'square', .08, -1200);
+  }
+  if (it === 'bom' || it === 'kopjager'){
+    const kind = it === 'bom' ? 'bom' : 'kop', p = P(c.idx), d = dir(c.idx), lat = (c.x-p.x)*(-d.y) + (c.y-p.y)*d.x;
+    const m = projMesh(kind); scene.add(m);
+    let target = null; if (kind === 'kop') target = RANK.find(o => o !== c) || null;
+    balls.push({ m, kind, idx: c.idx, frac: 0, lat: kind === 'kop' ? 0 : lat, t: 0, owner: c, h: p.h, target });
+    if (c === player) sfx.shoot();
+  }
   if (it === 'olie'){
     const x = c.x - fx*45, z = c.y - fy*45, gy = groundAt(x, z, c.idx);
     if (gy > -10){
@@ -2287,18 +2337,35 @@ function useItem(c){
     }
   }
   if (it === 'bal'){
-    const m = new THREE.Mesh(new THREE.SphereGeometry(11, 18, 14), new THREE.MeshStandardMaterial({ color: 0xff1744, emissive: 0x550000, metalness: .3, roughness: .25 }));
-    m.castShadow = true;
+    const m = projMesh('bal');
     const p = P(c.idx), d = dir(c.idx), lat = (c.x-p.x)*(-d.y) + (c.y-p.y)*d.x;
-    scene.add(m); balls.push({ m, idx: c.idx, frac: 0, lat, t: 0, owner: c, h: p.h });
+    scene.add(m); balls.push({ m, kind: 'bal', idx: c.idx, frac: 0, lat, t: 0, owner: c, h: p.h });
     if (c === player) sfx.shoot();
   }
   c.itemCount--; if (c.itemCount <= 0){ c.item = null; c.itemCount = 0; }
 }
-function hitKart(k){
-  if (k.spinT > 0) return;
+// vormen van de rijdende items
+function projMesh(kind){
+  if (kind === 'bom'){ const g = new THREE.Group(); const b = new THREE.Mesh(sph(12, 16), new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: .4, metalness: .3 })); g.add(b);
+    const fuse = new THREE.Mesh(G('fuse', () => new THREE.CylinderGeometry(1.2, 1.2, 8, 8)), new THREE.MeshStandardMaterial({ color: 0x8d6e63 })); fuse.position.y = 14; g.add(fuse);
+    const spark = new THREE.Mesh(sph(2.6, 8), new THREE.MeshBasicMaterial({ color: 0xffd54f })); spark.position.y = 19; g.add(spark); g.castShadow = true; return g; }
+  if (kind === 'kop'){ const g = new THREE.Group(); const b = new THREE.Mesh(G('kopcone', () => new THREE.ConeGeometry(9, 30, 14)), new THREE.MeshStandardMaterial({ color: 0xffc400, emissive: 0x7a4a00, metalness: .5, roughness: .25 })); b.rotation.z = -Math.PI/2; g.add(b);
+    const fin = new THREE.Mesh(rbox(8, 16, 2, .5), new THREE.MeshStandardMaterial({ color: 0xd50000 })); fin.position.x = -12; g.add(fin); return g; }
+  const m = new THREE.Mesh(sph(11, 18), new THREE.MeshStandardMaterial({ color: 0xff1744, emissive: 0x550000, metalness: .3, roughness: .25 })); m.castShadow = true; return m;
+}
+// item laten meebewegen langs de baan
+function advanceOnTrack(b, speed, dt){
+  let a = P(b.idx), n = P(b.idx+1);
+  b.frac += speed*dt / (Math.hypot(n.x-a.x, n.y-a.y) || 1);
+  while (b.frac >= 1){ b.frac -= 1; b.idx = (b.idx+1) % N; }
+  a = P(b.idx); n = P(b.idx+1); const nn = nrm(b.idx);
+  b.h = a.h + (n.h-a.h)*b.frac;
+  return [a.x + (n.x-a.x)*b.frac + nn.x*b.lat, a.y + (n.y-a.y)*b.frac + nn.y*b.lat, Math.atan2(n.y - a.y, n.x - a.x)];
+}
+function hitKart(k, dur = 1.1){
+  if (k.spinT > 0 || k.ghostT > 0) return;
   if (k.shieldT > 0){ k.shieldT = 0; return; }
-  k.spinT = 1.1; k.drifting = false; k.boostT = 0;
+  k.spinT = k.special === 'quickRecover' ? dur*0.55 : dur; k.drifting = false; k.boostT = 0;
   for (let i = 0; i < 10; i++) emit(k.x, k.z+10, k.y, (Math.random()-.5)*120, 30+Math.random()*40, (Math.random()-.5)*120, 0.9, 14, 46, 0xdddddd, 0.6);
   if (k === player){ sfx.hit(); showMsg('Au! Geraakt!'); shake = 1; }
 }
@@ -2314,7 +2381,7 @@ function driftLogic(c, inp, dt){
     if (!inp.drift || c.vf < 150 || c.spinT > 0){
       if (c.charge > 2.2) boost(c, 1.1); else if (c.charge > 1) boost(c, 0.55);
       c.drifting = false; c.charge = 0;
-    } else if (!c.air) c.charge += dt*(inp.steer*c.driftDir > 0 ? 1.4 : 0.9);
+    } else if (!c.air) c.charge += dt*(inp.steer*c.driftDir > 0 ? 1.4 : 0.9)*(c.special === 'driftPro' ? 1.35 : 1);
   }
 }
 function physics(c, inp, dt){
@@ -2324,7 +2391,7 @@ function physics(c, inp, dt){
   let vf = c.vx*fx + c.vy*fy, vr = c.vx*rx + c.vy*ry;
   const off = c.dist > ROAD/2 + CURB && c.boostT <= 0, onIce = P(c.idx).ice && !off, grounded = !c.air;
   let maxV = (off ? Math.min(600, 300*(c.offroad || 1)) : 640) * c.top * (c.ai ? c.skill*c.rubber : 1), acc = 520*c.acc;
-  maxV *= 1 + (c.draft || 0)*0.075;                 // slipstream
+  maxV *= 1 + (c.draft || 0)*0.075*(c.special === 'draft' ? 1.8 : 1);                 // slipstream
   if (c.boostT > 0){ maxV = 920*c.top; acc = 1700; }
   if (onIce) acc *= 0.7;
   acc *= 1.25 - 0.55*clamp(vf/maxV, 0, 1);
@@ -2353,6 +2420,11 @@ function physics(c, inp, dt){
   c.pitch += (clamp(-accel/9000, -0.06, 0.06) - c.pitch)*Math.min(1, dt*6);
   c.vf = vf; c.vr = vr;
   c.boostT = Math.max(0, c.boostT-dt); c.hopT = Math.max(0, c.hopT-dt); c.shieldT = Math.max(0, c.shieldT-dt);
+  c.ghostT = Math.max(0, (c.ghostT || 0) - dt);
+  if (c.magnetT > 0){ c.magnetT -= dt;   // magneet: trek naar de wagen vlak voor je
+    const ahead = RANK[RANK.indexOf(c) - 1];
+    if (ahead && Math.hypot(ahead.x - c.x, ahead.y - c.y) < 900 && !c.drifting) c.h += wrap(Math.atan2(ahead.y - c.y, ahead.x - c.x) - c.h)*Math.min(1, dt*1.2);
+    if (Math.random() < 0.4) emit(c.x, c.z + 20, c.y, (Math.random()-.5)*40, 30, (Math.random()-.5)*40, 0.4, 5, 2, 0x40c4ff, 1); }
   if (c.spinT > 0){ c.spinT -= dt; c.spinA += dt*14; if (c.spinT <= 0){ c.spinT = 0; c.spinA = 0; } }
 }
 // hoogte: heuvels volgen, springen en vallen
@@ -2399,7 +2471,7 @@ function trackProgress(c){
       // echte klap: hoe rechter je de muur raakt, hoe meer snelheid je verliest
       const impact = vn/speed;                                      // 0 = schampen, 1 = recht ertegenaan
       c.vx -= nx*vn*1.25; c.vy -= ny*vn*1.25;                       // kleine terugkaats
-      const keep = 1 - clamp(impact*impact*0.9 + impact*0.12, 0, 0.75);   // schampen kost weinig, frontaal veel
+      const keep = 1 - clamp(impact*impact*0.9 + impact*0.12, 0, 0.75)*(c.special === 'wallTough' ? 0.55 : 1);   // schampen kost weinig, frontaal veel
       c.vx *= keep; c.vy *= keep;
       // wagen draait een beetje mee langs de muur
       let tx = -ny, ty = nx; if (tx*Math.cos(c.h) + ty*Math.sin(c.h) < 0){ tx = -tx; ty = -ty; }
@@ -2511,7 +2583,7 @@ let podiumCup = null;
 
 function collisions(){
   for (let i = 0; i < cars.length; i++) for (let j = i+1; j < cars.length; j++){
-    const a = cars[i], b = cars[j]; if (Math.abs(a.z - b.z) > 25) continue;
+    const a = cars[i], b = cars[j]; if (Math.abs(a.z - b.z) > 25 || a.ghostT > 0 || b.ghostT > 0) continue;
     const dx = b.x-a.x, dy = b.y-a.y, d = Math.hypot(dx, dy);
     if (d > 0 && d < 32){
       const nx = dx/d, ny = dy/d, o = (32-d)/2;
@@ -2539,6 +2611,8 @@ function rocketStarts(){
     if (c.ai){ const r = Math.random(); g = r < c.skill*0.45*LV().rocket ? 1 : r < 0.8 ? 2 : null; }
     c.gasAt = null;
     if (g == null) continue;
+    if (c.special === 'shieldStart') c.shieldT = 6;
+    if (c.special === 'rocket' && g != null && g <= 2.6) g = 1;
     if (g <= 1.5){ boost(c, 1.3); notify(c, '🚀 RAKETSTART!'); }
     else if (g <= 2.5){ boost(c, 0.5); notify(c, '👍 Goede start'); }
     else { c.stallT = 1.1; notify(c, '💨 Te vroeg! Motor afgeslagen'); if (c === player) sfx.bump(); }
@@ -2624,7 +2698,7 @@ function update(dt){
         b.g.visible = false; b.off = 2.5;
         if (!c.item && c.rollT <= 0){ c.rollT = c.ai ? 0.6 : 1.2; if (c === player) sfx.item(); }
       }
-      if (c.rollT > 0){ c.rollT -= dt; if (c.rollT <= 0){ c.rollT = 0; c.item = pickItem(c); c.itemCount = c.item === 'turbo3' ? 3 : 1; c.aiUseT = (1 + Math.random()*3)*LV().items; } }
+      if (c.rollT > 0){ c.rollT -= dt; if (c.rollT <= 0){ c.rollT = 0; c.item = pickItem(c); c.itemCount = c.item === 'turbo3' ? 3 : 1; c.aiUseT = (['bliksem', 'kopjager', 'spook'].includes(c.item) ? 0.4 : 1 + Math.random()*3)*LV().items; } }
       if (c.ai && c.item){ c.aiUseT -= dt; if (c.aiUseT <= 0){ useItem(c); c.aiUseT = (0.6 + Math.random()*1.5)*LV().items; } }
       for (const p of pads) if (!c.air && (p.x-c.x)**2 + (p.z-c.y)**2 < 45*45 && Math.abs(c.z - p.h) < 25 && c.boostT < 0.8) boost(c, 1.0);
     }
@@ -2634,19 +2708,33 @@ function update(dt){
     for (let i = slicks.length-1; i >= 0; i--){ const s = slicks[i];
       for (const c of cars) if (!c.air && Math.abs(c.z - s.y) < 20 && (s.x-c.x)**2 + (s.z-c.y)**2 < 30*30){ hitKart(c); world.remove(s.m); slicks.splice(i, 1); break; } }
     for (let i = balls.length-1; i >= 0; i--){
-      const b = balls[i]; b.t += dt;
-      let a = P(b.idx), n = P(b.idx+1);
-      b.frac += 1350*dt / (Math.hypot(n.x-a.x, n.y-a.y) || 1);
-      while (b.frac >= 1){ b.frac -= 1; b.idx = (b.idx+1)%N; }
-      a = P(b.idx); n = P(b.idx+1); const nn = nrm(b.idx);
-      let target = null, td = 450;
-      for (const c of cars){ if (c === b.owner) continue; const d = Math.hypot(c.x-b.m.position.x, c.y-b.m.position.z); if (d < td && Math.abs(c.z - b.h) < 50){ td = d; target = c; } }
-      if (target){ const p = P(target.idx), d = dir(target.idx); const tl = (target.x-p.x)*(-d.y) + (target.y-p.y)*d.x; b.lat += (tl-b.lat)*Math.min(1, dt*6); }
-      const x = a.x + (n.x-a.x)*b.frac + nn.x*b.lat, z = a.y + (n.y-a.y)*b.frac + nn.y*b.lat;
-      b.h = a.h + (n.h-a.h)*b.frac;
-      b.m.position.set(x, b.h + 12 + Math.abs(Math.sin(b.t*12))*10, z);
-      let gone = b.t > 6;
-      for (const c of cars) if ((c !== b.owner || b.t > 1) && Math.abs(c.z - b.h) < 40 && (c.x-x)**2 + (c.y-z)**2 < 30*30){ hitKart(c); gone = true; break; }
+      const b = balls[i]; b.t += dt; let gone = false;
+      if (b.kind === 'bom'){
+        // bom: rolt kort vooruit, ligt dan stil en ontploft na een tijdje of bij aanraking
+        if (b.t < 0.45){ const [x, z] = advanceOnTrack(b, 900, dt); b.m.position.set(x, b.h + 12 + Math.sin(b.t/0.45*Math.PI)*28, z); }
+        else b.m.position.y = b.h + 12;
+        b.m.children[2].visible = Math.floor(b.t*14) % 2 === 0;
+        const pos = b.m.position; let boom = b.t > 2.0;
+        for (const c of cars) if (!c.ghostT && (c !== b.owner || b.t > 0.7) && Math.abs(c.z - b.h) < 30 && (c.x - pos.x)**2 + (c.y - pos.z)**2 < 34*34) boom = true;
+        if (boom){ explode(pos.x, b.h, pos.z, 140); gone = true; }
+      } else if (b.kind === 'kop'){
+        // kopjager: vliegt hoog over de baan naar de koploper
+        const tg = b.target && cars.includes(b.target) ? b.target : null;
+        if (tg){ const p = P(tg.idx), d = dir(tg.idx); b.lat += (((tg.x-p.x)*(-d.y) + (tg.y-p.y)*d.x) - b.lat)*Math.min(1, dt*3); }
+        const [x, z, ang] = advanceOnTrack(b, 1900, dt);
+        b.m.position.set(x, b.h + 42, z); b.m.rotation.y = -ang;
+        if (Math.random() < 0.6) emit(x, b.h + 42, z, (Math.random()-.5)*30, 10, (Math.random()-.5)*30, 0.5, 8, 22, 0xffab00, 0.8);
+        if (tg && Math.hypot(tg.x - x, tg.y - z) < 70){ explode(tg.x, tg.z, tg.y, 60); hitKart(tg, 1.7); gone = true; }
+        if (b.t > 14 || !tg) gone = true;
+      } else {
+        let target = null, td = 450;
+        for (const c of cars){ if (c === b.owner || c.ghostT > 0) continue; const d = Math.hypot(c.x-b.m.position.x, c.y-b.m.position.z); if (d < td && Math.abs(c.z - b.h) < 50){ td = d; target = c; } }
+        if (target){ const p = P(target.idx), d = dir(target.idx); const tl = (target.x-p.x)*(-d.y) + (target.y-p.y)*d.x; b.lat += (tl-b.lat)*Math.min(1, dt*6); }
+        const [x, z] = advanceOnTrack(b, 1350, dt);
+        b.m.position.set(x, b.h + 12 + Math.abs(Math.sin(b.t*12))*10, z);
+        gone = b.t > 6;
+        for (const c of cars) if ((c !== b.owner || b.t > 1) && !c.ghostT && Math.abs(c.z - b.h) < 40 && (c.x-x)**2 + (c.y-z)**2 < 30*30){ hitKart(c); gone = true; break; }
+      }
       if (gone){ scene.remove(b.m); balls.splice(i, 1); }
     }
   }
@@ -2672,6 +2760,7 @@ function syncKart(c, dt){
   const showSparks = c.drifting && c.charge > 1;
   M.sparks.forEach(s => { s.visible = showSparks; s.scale.setScalar(0.6 + Math.random()*0.9); });
   M.sparkMat.color.setHex(c.charge > 2.2 ? 0xff9100 : 0x40c4ff);
+  if (c.ghostT > 0){ M.root.visible = Math.floor(simT*14) % 2 === 0; c.wasGhost = true; } else if (c.wasGhost){ M.root.visible = true; c.wasGhost = false; }
   M.shield.visible = c.shieldT > 0; M.shield.material.opacity = 0.25 + Math.sin(simT*10)*0.08;
 }
 
