@@ -1452,6 +1452,22 @@ function numberTex(n){
 const harnessMat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.7 });
 const bootMat = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6 });
 const visorDark = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, metalness: 0.85, roughness: 0.08, transparent: true, opacity: 0.62, side: THREE.DoubleSide });
+// Uiterlijk per coureur (zelfde volgorde als DRIVERS): huid, kapsel, haarkleur en accessoires
+const LOOKS = [
+  { skin: 0xf3d2b3, hair: 'quiff',    hairCol: 0x7a5230, acc: [] },                         // Rocco
+  { skin: 0xe0ac69, hair: 'ponytail', hairCol: 0xc04fd0, acc: ['earrings'] },               // Nova
+  { skin: 0xc68642, hair: 'bald',     hairCol: 0x4e342e, acc: ['beard'] },                  // Bruno
+  { skin: 0xffdbac, hair: 'spiky',    hairCol: 0xf2d16b, acc: ['shades'] },                 // Zippy
+  { skin: 0x8d5524, hair: 'afro',     hairCol: 0x1b1b1b, acc: ['headband'] },               // Tito
+  { skin: 0xffe0c8, hair: 'bob',      hairCol: 0xff7eb6, acc: ['catears'] },                // Mimi
+  { skin: 0xd9a07b, hair: 'mohawk',   hairCol: 0xd32f2f, acc: ['goatee'] },                 // Draco
+  { skin: 0xa86b3c, hair: 'buns',     hairCol: 0x00897b, acc: [] },                         // Kiki
+  { skin: 0xc99a6b, hair: 'cap',      hairCol: 0x5d4037, acc: ['stubble'], capCol: 0x37474f },   // Rex
+  { skin: 0xf1c27d, hair: 'slick',    hairCol: 0x4a2c17, acc: ['mustache', 'shades'] },     // Blitz
+  { skin: 0xffe5d0, hair: 'messy',    hairCol: 0xd2691e, acc: ['glasses', 'freckles'] },    // Pip
+  { skin: 0x6b4226, hair: 'long',     hairCol: 0x111111, acc: ['beard'] },                  // Gorgo
+];
+const eyeGloss = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.12, metalness: 0.35 });
 const PATCH_COLS = [0xffd600, 0xffffff, 0x00b0ff, 0xff1744];
 // romp als afgerond blok langs de ruggengraat (van heup naar schouders)
 function torsoBlock(parent, mat, a, b, w, d, extras){
@@ -1464,7 +1480,7 @@ function torsoBlock(parent, mat, a, b, w, d, extras){
 function makeDriver(parent, d, suit, P){
   { const lk = (CLASSES[d.cls] || CLASSES.middel).look, dg = new THREE.Group(); dg.scale.set(1, lk[0], lk[1]); parent.add(dg); parent = dg; }
   const di = Math.max(0, DRIVERS.findIndex(x => x.name === d.name));
-  const skin = new THREE.MeshStandardMaterial({ color: SKINS[(di*5 + 1) % SKINS.length], roughness: 0.6 });
+  const skin = new THREE.MeshStandardMaterial({ color: LOOKS[di % LOOKS.length].skin, roughness: 0.6 });
   const hairMat = new THREE.MeshStandardMaterial({ color: HAIR_COLS[(di*3 + 2) % HAIR_COLS.length], roughness: 0.75 });
   const helmet = new THREE.MeshStandardMaterial({ color: d.color, metalness: 0.35, roughness: 0.18, side: THREE.DoubleSide });
   const helmet2 = new THREE.MeshStandardMaterial({ color: new THREE.Color(d.color).lerp(new THREE.Color(0xffffff), 0.75), metalness: 0.3, roughness: 0.2, side: THREE.DoubleSide });
@@ -1486,28 +1502,51 @@ function makeDriver(parent, d, suit, P){
   });
   // nekbeschermer (zoals bij echte coureurs) en nek
   const hans = put(G('hans', () => new THREE.TorusGeometry(3.4, 1.3, 8, 20)), harnessMat, [sh[0], sh[1] + 1.2, 0]); hans.rotation.x = Math.PI/2;
-  limb3(parent, skin, 1.9, 1.8, [sh[0], sh[1] + 1, 0], [P.head[0] - 0.5, P.head[1] - 3.6, 0]);
+  limb3(parent, skin, 2.2, 2.1, [sh[0], sh[1] + 1, 0], [P.head[0] - 0.5, P.head[1] - 1.5, 0]);
 
-  // --- hoofd met dichte racehelm (los, zodat het kan bewegen) ---
-  const head = new THREE.Group(); head.position.set(P.head[0], P.head[1], 0); parent.add(head);
-  put(sph(4.4, 18), skin, [0.3, -0.3, 0], head).scale.set(1, 1.05, 0.95);     // gezicht achter het vizier
+  // --- hoofd in figuurstijl: groot hoofd, kraaloogjes, eigen kapsel en accessoires (los, zodat het kan bewegen) ---
+  const LK = LOOKS[di % LOOKS.length];
+  const skinF = new THREE.MeshStandardMaterial({ color: LK.skin, roughness: 0.55 });
+  const hairF = new THREE.MeshStandardMaterial({ color: LK.hairCol, roughness: LK.hair === 'slick' ? 0.25 : 0.7 });
+  const head = new THREE.Group(); head.position.set(P.head[0], P.head[1] + 2.5, 0); parent.add(head);
+  const HR = 6.6, A = (geo, mat, p, par = head) => { const m = new THREE.Mesh(geo, mat); m.position.set(p[0], p[1], p[2] || 0); par.add(m); return m; };
+  A(sph(HR, 26), skinF, [0, 0, 0]).scale.set(1, 0.96, 1.02);                                   // hoofd
   for (const s of [-1, 1]){
-    put(sph(0.62, 8), eyeWhite, [3.95, 0.45, s*1.55], head);
-    put(sph(0.36, 8), eyeMat, [4.42, 0.45, s*1.55], head);
-    const brow = put(G('brow2', () => new THREE.BoxGeometry(0.35, 0.35, 1.5)), hairMat, [4.25, 1.45, s*1.6], head); brow.rotation.x = s*0.12;
+    A(sph(1.5, 10), skinF, [0, -0.6, s*6.55]).scale.set(0.7, 1, 0.6);                          // oren
+    A(sph(1.35, 14), eyeGloss, [5.55, 0.2, s*2.75]).scale.set(0.55, 1, 1);                     // glanzende kraaloogjes
+    A(sph(0.33, 8), eyeWhite, [6.25, 0.75, s*2.45]);                                           // lichtpuntje
+    const brow = A(rbox(0.6, 0.75, 2.8, 0.3), hairF, [6.0, 2.55, s*2.75]); brow.rotation.x = -s*0.12;   // wenkbrauwen
   }
-  // helm: bovenkant, zijkanten en kinstuk, met een opening voor het vizier
-  const R = 5.7;
-  put(G('helmTop', () => new THREE.SphereGeometry(R, 28, 10, 0, Math.PI*2, 0, 0.98)), helmet, [0, 0, 0], head);
-  put(G('helmSide', () => new THREE.SphereGeometry(R, 28, 6, Math.PI + 0.82, Math.PI*2 - 1.64, 0.98, 0.62)), helmet, [0, 0, 0], head);
-  put(G('helmChin', () => new THREE.SphereGeometry(R, 28, 8, 0, Math.PI*2, 1.6, 0.95)), helmet, [0, 0, 0], head);
-  put(G('helmVisor', () => new THREE.SphereGeometry(R + 0.12, 20, 6, Math.PI - 0.86, 1.72, 0.94, 0.7)), visorDark, [0, 0, 0], head);
-  // helmdesign: brede streep over het midden en een kleine spoiler achterop
-  const stripe = put(G('hstripe2', () => new THREE.TorusGeometry(R + 0.06, 1.1, 6, 30, 2.2)), helmet2, [0, 0, 0], head); stripe.rotation.z = 0.55;
-  const spoiler = put(rbox(3.2, 1, 6, 0.4), helmet2, [-4.4, 4.2, 0], head); spoiler.rotation.z = -0.5;
-  for (const s of [-1, 1]) put(sph(0.7, 8), chrome, [0.5, -0.6, s*(R - 0.1)], head);     // vizierscharnieren
-  // paardenstaart onder de helm uit (bij sommige coureurs)
-  if (HAIR_STYLES[di % HAIR_STYLES.length] === 'staart'){ limb3(head, hairMat, 1.5, 1.0, [-5.2, -2.6, 0], [-7.6, -8.6, 0]); put(sph(1.1, 8), hairMat, [-7.7, -8.9, 0], head); }
+  A(sph(0.85, 10), skinF, [6.55, -1.0, 0]).scale.set(0.7, 1, 0.8);                             // neusje
+  const cap = (theta, mat = hairF, r = HR*1.05) => A(G('hcap' + theta + r, () => new THREE.SphereGeometry(r, 26, 12, 0, Math.PI*2, 0, theta)), mat, [0, 0, 0]);
+  const openFront = (theta, r = HR*1.08) => A(G('hopen' + theta, () => new THREE.SphereGeometry(r, 26, 14, Math.PI + 1.0, Math.PI*2 - 2.0, 0, theta)), hairF, [0, 0, 0]);
+  switch (LK.hair){
+    case 'quiff': cap(1.05); { const q = A(sph(3.2, 14), hairF, [4.3, 5.6, 0]); q.scale.set(1.2, 0.85, 1.7); q.rotation.z = -0.45; } break;
+    case 'ponytail': cap(1.15); A(sph(4, 14), hairF, [-4.4, 2.2, 0]); limb3(head, hairF, 1.9, 1.1, [-6.2, 4.2, 0], [-9.6, -4, 0]); A(sph(1.2, 10), hairF, [-9.7, -4.3, 0]); break;
+    case 'spiky': cap(1.0); for (let k = 0; k < 9; k++){ const a = k/9*Math.PI*2, sp = A(G('spike', () => new THREE.ConeGeometry(1.7, 5, 10)), hairF, [Math.cos(a)*3.6, 6.3, Math.sin(a)*3.6]); sp.rotation.set(Math.sin(a)*0.55, 0, -Math.cos(a)*0.55); } A(G('spike', () => new THREE.ConeGeometry(1.7, 5, 10)), hairF, [0, 7.6, 0]); break;
+    case 'afro': A(sph(8, 22), hairF, [-1.8, 3.2, 0]); break;
+    case 'bob': openFront(1.95); A(rbox(2, 2.2, 9.6, 0.9), hairF, [5.5, 4.6, 0]); break;
+    case 'mohawk': for (let k = 0; k < 7; k++){ const a = 0.55 + k*0.33, b = A(rbox(2, 4, 1.8, 0.6), hairF, [Math.cos(a)*HR*0.98, Math.sin(a)*HR*0.98, 0]); b.rotation.z = a - Math.PI/2; } break;
+    case 'buns': cap(1.05); for (const s of [-1, 1]) A(sph(2.9, 14), hairF, [-1, 6.6, s*3.6]); break;
+    case 'cap': { const cm = new THREE.MeshStandardMaterial({ color: LK.capCol || 0x37474f, roughness: 0.6 }); cap(1.12, cm, HR*1.06); A(rbox(6.5, 0.8, 9, 0.35), cm, [-7.2, 4, 0]); A(sph(0.8, 8), cm, [0, 7, 0]);
+      for (const s of [-1, 1]) A(rbox(1.4, 2.6, 0.8, 0.3), hairF, [2.4, -1.4, s*6.4]); } break;
+    case 'slick': cap(1.15); A(sph(3.6, 14), hairF, [-4.6, 1.6, 0]); break;
+    case 'messy': cap(1.05); for (let k = 0; k < 7; k++){ const a = k/7*Math.PI*2; A(sph(1.9, 10), hairF, [Math.cos(a)*3 + 1, 6.4 + (k % 2)*0.6, Math.sin(a)*3.4]); } break;
+    case 'long': openFront(2.2); A(rbox(3.2, 12, 11.5, 1.5), hairF, [-5.6, -4, 0]); break;
+  }
+  const accMat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.3, metalness: 0.4 });
+  for (const ac of LK.acc){
+    if (ac === 'shades') A(rbox(1, 2.4, 8.8, 0.7), accMat(0x111111), [6.3, 0.3, 0]);
+    if (ac === 'glasses'){ for (const s of [-1, 1]){ const g = A(G('lens', () => new THREE.TorusGeometry(1.7, 0.28, 8, 18)), accMat(0x3e2723), [6.25, 0.25, s*2.75]); g.rotation.y = Math.PI/2; } A(rbox(0.4, 0.4, 1.4, 0.15), accMat(0x3e2723), [6.6, 0.4, 0]); }
+    if (ac === 'beard') A(sph(5.6, 18), hairF, [2.6, -3.4, 0]).scale.set(0.95, 0.75, 1.06);
+    if (ac === 'stubble') A(sph(5.9, 18), new THREE.MeshStandardMaterial({ color: new THREE.Color(LK.skin).lerp(new THREE.Color(LK.hairCol), 0.45), roughness: 0.9 }), [1.5, -2.6, 0]).scale.set(0.95, 0.72, 1.04);
+    if (ac === 'goatee'){ const gt = A(G('goatee', () => new THREE.ConeGeometry(1.5, 3.4, 10)), hairF, [5.0, -6.4, 0]); gt.rotation.z = Math.PI + 0.5; }
+    if (ac === 'mustache') A(rbox(0.9, 0.9, 3.8, 0.4), hairF, [6.55, -2.1, 0]);
+    if (ac === 'headband'){ const hb = A(G('hband', () => new THREE.TorusGeometry(HR*1.0, 0.75, 8, 28)), accMat(0xffffff), [0, 2.9, 0]); hb.rotation.x = Math.PI/2; hb.scale.set(1, 1.03, 1); }
+    if (ac === 'catears') for (const s of [-1, 1]){ const e = A(G('catear', () => new THREE.ConeGeometry(1.9, 3.8, 10)), hairF, [0.4, 7.4, s*3.5]); e.rotation.x = -s*0.25; }
+    if (ac === 'earrings') for (const s of [-1, 1]) A(sph(0.6, 8), accMat(0xffd54f), [0, -2.4, s*6.7]);
+    if (ac === 'freckles') for (const s of [-1, 1]) for (let k = 0; k < 3; k++) A(sph(0.25, 6), accMat(0x8d5524), [6.0, -1.1 + (k % 2)*0.5, s*(1.6 + k*0.6)]);
+  }
 
   // --- armen, handschoenen, benen en raceschoenen ---
   for (const s of [-1, 1]){
@@ -1677,12 +1716,12 @@ function makeBuggyMesh(d){
   add(rbox(3, 3, 26, 1), chrome, 30.5, 13, 0);                                   // bumper
   // rolkooi
   for (const s of [-1, 1]){
-    limb3(body, chrome, 1.1, 1.1, [-11, 21, s*10], [-11, 50, s*9]);
-    limb3(body, chrome, 1.1, 1.1, [8, 21, s*10], [2, 48, s*9]);
-    limb3(body, chrome, 1.1, 1.1, [-11, 50, s*9], [2, 48, s*9]);
-    limb3(body, chrome, 1.1, 1.1, [-11, 50, s*9], [-21, 21, s*10]);
+    limb3(body, chrome, 1.1, 1.1, [-11, 21, s*10], [-11, 58, s*9]);
+    limb3(body, chrome, 1.1, 1.1, [8, 21, s*10], [2, 56, s*9]);
+    limb3(body, chrome, 1.1, 1.1, [-11, 58, s*9], [2, 56, s*9]);
+    limb3(body, chrome, 1.1, 1.1, [-11, 58, s*9], [-21, 21, s*10]);
   }
-  limb3(body, chrome, 1.1, 1.1, [-11, 50, -9], [-11, 50, 9]); limb3(body, chrome, 1.1, 1.1, [2, 48, -9], [2, 48, 9]);
+  limb3(body, chrome, 1.1, 1.1, [-11, 58, -9], [-11, 58, 9]); limb3(body, chrome, 1.1, 1.1, [2, 56, -9], [2, 56, 9]);
   add(rbox(10, 9, 14, 2.5), carbon, -19, 21, 0);                                 // motor
   limb3(body, chrome, 1.6, 1.4, [-22, 22, 4], [-25, 31, 4]);                     // uitlaat omhoog
   add(rbox(13, 3, 15, 1.3), carbon, -4, 20, 0);                                  // stoel
