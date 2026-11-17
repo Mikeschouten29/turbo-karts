@@ -475,7 +475,7 @@ const metal = new THREE.MeshStandardMaterial({ color: 0xd0d4d8, metalness: 0.6, 
 
 // ================= Baan-gegevens (worden per baan opnieuw gevuld) =================
 let TR, TH, PTS = [], N = 0, DIST = [], B, CX = 0, CZ = 0, minX, minY, maxX, maxY;
-let worldAnims = [], WATERBOX = null, LIQBOXES = [];
+let worldAnims = [], WATERBOX = null, LIQBOXES = [], gates = [];
 let pads = [], boxes = [], world = null, currentTrack = -1, volcanoTop = null, bestEver = null;
 const P = i => PTS[((i%N)+N)%N];
 function dir(i){ const a = P(i), b = P(i+1), dx = b.x-a.x, dy = b.y-a.y, l = Math.hypot(dx,dy) || 1; return {x:dx/l, y:dy/l}; }
@@ -753,7 +753,7 @@ function buildTrack(k){
     if (t2 - t1 < 22) continue;
     const legs = [...legsAt(t1), ...legsAt(t2)];
     for (const L of legs) limb3(bridgeDeco, towerMat, 7, 5, [L.x, 0, L.z], [L.x, L.top, L.z]);
-    for (const ti of [t1, t2]){ const [A, B2] = legs.filter(L => L.ti === ti); for (const hgt of [P(ti).h + 40, A.top - 8]) limb3(bridgeDeco, towerMat, 3.5, 3.5, [A.x, hgt, A.z], [B2.x, hgt, B2.z]); }
+    for (const ti of [t1, t2]){ const [A, B2] = legs.filter(L => L.ti === ti); for (const hgt of [P(ti).h + 92, A.top - 8]) limb3(bridgeDeco, towerMat, 3.5, 3.5, [A.x, hgt, A.z], [B2.x, hgt, B2.z]); }
     for (const s of [-1, 1]){
       const cableY = i => { const top = P(t1).h + 120, low = P(Math.round((t1 + t2)/2)).h + 26, u = (i - (t1 + t2)/2)/((t2 - t1)/2); return low + (top - low)*u*u; };
       const at = (i, y) => { const p = P(i), n = nrm(i); return [p.x + n.x*s*side, y, p.y + n.y*s*side]; };
@@ -973,6 +973,102 @@ function buildTrack(k){
       const g = onTrack(i, lat, 26), m = new THREE.Mesh(boxGeo, new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x6633ff, transparent: true, opacity: .9, shininess: 90 }));
       m.castShadow = true; g.add(m); boxes.push({ g, m, x: g.position.x, z: g.position.z, h: P(i).h, off: 0, ph: Math.random()*6 });
     } }
+
+  // --- turbopoorten: neon bogen over de weg (rijd erdoor voor een turbo) ---
+  gates = [];
+  { const bad = i => { for (let q = -14; q <= 14; q += 2){ const p = P(i + q); if (p.tunnel || p.bridge || p.gap || p.ramp) return true; } return false; };
+    const curv = i => { const a = dir(i - 12), b = dir(i + 12); return 1 - (a.x*b.x + a.y*b.y); };
+    const near = (i, list, m) => list.some(j => Math.min(Math.abs(i - j), N - Math.abs(i - j)) < m);
+    const avoid = [0, ...TR.pads.map(idxOf), ...TR.boxes.map(idxOf)];
+    const cand = [];
+    for (let i = Math.floor(N*0.12); i < N*0.95; i += 4) if (!bad(i) && !near(i, avoid, 30)) cand.push([curv(i), i]);
+    cand.sort((a, b) => a[0] - b[0]);
+    const pick = []; for (const [, i] of cand){ if (pick.length >= 2) break; if (!near(i, pick, N/4)) pick.push(i); }
+    const gateCols = [0x00e5ff, 0xff4081, 0xffea00];
+    for (const gi of pick){
+      const g = onTrack(gi, 0, 0), rings = [];
+      for (let q = 0; q < 3; q++){
+        const m = new THREE.MeshBasicMaterial({ color: gateCols[q], toneMapped: false, transparent: true, opacity: 0.95 });
+        const ring = new THREE.Mesh(G('gateRing', () => new THREE.TorusGeometry(WALL + 14, 4.5, 8, 48, Math.PI)), m);
+        ring.rotation.y = Math.PI/2; ring.position.x = (q - 1)*34; g.add(ring); rings.push(m);
+      }
+      for (const sd of [-1, 1]){ const base = new THREE.Mesh(rbox(26, 14, 26, 4), new THREE.MeshStandardMaterial({ color: 0x263238, metalness: 0.6, roughness: 0.3 })); base.position.set(0, 7, sd*(WALL + 14)); g.add(base); }
+      worldAnims.push(t => rings.forEach((m, q) => { m.opacity = 0.35 + 0.65*Math.max(0, Math.sin(t*9 - q*1.6)); }));
+      gates.push(gi);
+    }
+  }
+
+  // --- spektakel in de lucht en rond de baan ---
+  { const RS = rng(500 + k), far = Math.max(maxX - minX, maxY - minY)/2;
+    const randomSpot = (extra) => { for (let q = 0; q < 200; q++){ const x = B.x0 + RS()*(B.x1-B.x0), y = B.y0 + RS()*(B.y1-B.y0); if (roadClear(x, y, extra)) return [x, y]; } return null; };
+    // zeppelin met TURBO KARTS die rondjes vliegt boven de baan
+    const zep = new THREE.Group(), zm = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.4, metalness: 0.1 });
+    const zTex = canvasTex(512, 128, (c, w, h) => { c.fillStyle = '#c62828'; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; c.font = 'italic 900 78px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('TURBO KARTS', w/2, h/2 + 4); });
+    const hull = new THREE.Mesh(sph(70, 28), zm); hull.scale.set(3.2, 1, 1); zep.add(hull);
+    for (const sd of [-1, 1]){ const pl = new THREE.Mesh(new THREE.PlaneGeometry(260, 52), new THREE.MeshBasicMaterial({ map: zTex, side: THREE.DoubleSide })); pl.position.set(10, 4, sd*70.5); pl.scale.x = sd; zep.add(pl); }
+    const finM = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.5 });
+    for (const [rx, sy, sz] of [[0, 1, 0.12], [Math.PI/2, 1, 0.12]]){ const fin = new THREE.Mesh(rbox(60, 70, 8, 3), finM); fin.position.x = -200; fin.rotation.x = rx; zep.add(fin); }
+    const gond = new THREE.Mesh(rbox(60, 16, 22, 6), finM); gond.position.set(20, -72, 0); zep.add(gond);
+    if (TH.stars){ const glow = new THREE.PointLight(0xffffff, 0.6, 900); glow.position.set(0, -90, 0); zep.add(glow); }
+    addW(zep);
+    const zr = far + 400, zh = 900;
+    worldAnims.push(t => { const a = t*0.05; zep.position.set(CX + Math.cos(a)*zr, zh + Math.sin(t*0.4)*25, CZ + Math.sin(a)*zr); zep.rotation.y = -a - Math.PI/2; });
+
+    if (!TH.stars){
+      // kleurige heteluchtballonnen
+      const bCols = [['#e53935', '#ffeb3b'], ['#1e88e5', '#ffffff'], ['#43a047', '#ff9800'], ['#8e24aa', '#ffd54f'], ['#00acc1', '#ff4081'], ['#f4511e', '#3949ab']];
+      const basketM = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.9 }), ropeM = new THREE.MeshBasicMaterial({ color: 0x5d4037 });
+      for (let q = 0; q < 6; q++){
+        const [c1, c2] = bCols[q];
+        const tex = canvasTex(256, 64, (c, w, h) => { for (let x = 0; x < 8; x++){ c.fillStyle = x % 2 ? c1 : c2; c.fillRect(x*w/8, 0, w/8 + 1, h); } });
+        const b = new THREE.Group(), env = new THREE.Mesh(sph(55, 22), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+        env.scale.set(1, 1.18, 1); env.position.y = 95; b.add(env);
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(22, 12, 30, 16), env.material); neck.position.y = 32; b.add(neck);
+        const basket = new THREE.Mesh(rbox(18, 14, 18, 3), basketM); basket.position.y = 0; b.add(basket);
+        for (const [x, z] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) limb3(b, ropeM, 0.5, 0.5, [x, 6, z], [x*1.5, 22, z*1.5]);
+        const a = RS()*Math.PI*2, r = far*(0.5 + RS()*0.9) + 300, x0 = CX + Math.cos(a)*r, z0 = CZ + Math.sin(a)*r, y0 = 450 + RS()*700, ph = RS()*6;
+        b.position.set(x0, y0, z0); addW(b);
+        worldAnims.push(t => { b.position.y = y0 + Math.sin(t*0.3 + ph)*40; b.position.x = x0 + Math.sin(t*0.05 + ph)*220; b.rotation.y = t*0.05 + ph; });
+      }
+    } else {
+      // zoeklichten die door de nachtlucht zwaaien
+      const beamM = new THREE.MeshBasicMaterial({ color: 0xbfd8ff, transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+      const beamG = new THREE.CylinderGeometry(70, 6, 3200, 16, 1, true); beamG.translate(0, 1600, 0);
+      for (let q = 0; q < 5; q++){
+        const sp = randomSpot(40); if (!sp) continue;
+        const pivot = new THREE.Group(); pivot.position.set(sp[0], 8, sp[1]); pivot.add(new THREE.Mesh(beamG, beamM)); addW(pivot);
+        const lamp = new THREE.Mesh(new THREE.CylinderGeometry(14, 18, 16, 12), new THREE.MeshStandardMaterial({ color: 0x37474f })); lamp.position.set(sp[0], 8, sp[1]); addW(lamp);
+        const ph = q*1.3;
+        worldAnims.push(t => { pivot.rotation.z = Math.sin(t*0.45 + ph)*0.55; pivot.rotation.x = Math.cos(t*0.33 + ph)*0.45; });
+      }
+      // vuurwerk boven de baan
+      const fwCols = [0xff1744, 0x00e5ff, 0xffea00, 0x76ff03, 0xff4081, 0xffffff];
+      let fwT = 1;
+      worldAnims.push((t, dt) => { fwT -= dt; if (fwT > 0) return; fwT = 1.2 + Math.random()*1.6;
+        const a = Math.random()*Math.PI*2, r = Math.random()*far*0.8, x = CX + Math.cos(a)*r, z = CZ + Math.sin(a)*r, y = 650 + Math.random()*450, col = fwCols[Math.floor(Math.random()*fwCols.length)];
+        for (let q = 0; q < 34; q++){ const u = Math.random()*2 - 1, th = Math.random()*Math.PI*2, w = Math.sqrt(1 - u*u), v = 240 + Math.random()*60;
+          emit(x, y, z, Math.cos(th)*w*v, u*v, Math.sin(th)*w*v, 1.6, 26, 8, col, 1, 120); } });
+    }
+
+    // reuzenrad aan het strand en in de haven
+    if (TR.theme === 'beach' || TR.theme === 'harbor'){
+      const sp = randomSpot(260);
+      if (sp){
+        const wheel = new THREE.Group(), fr = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.5, roughness: 0.3 }), Rw = 190;
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(Rw, 4, 8, 48), fr); wheel.add(rim);
+        const rim2 = rim.clone(); rim2.position.z = 30; wheel.add(rim2);
+        const cabCols = [0xe53935, 0xfdd835, 0x1e88e5, 0x43a047, 0x8e24aa, 0xff6d00].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }));
+        const cabs = [];
+        for (let q = 0; q < 12; q++){ const a = q/12*Math.PI*2;
+          limb3(wheel, fr, 2, 2, [0, 0, 15], [Math.cos(a)*Rw, Math.sin(a)*Rw, 15]);
+          const cab = new THREE.Mesh(rbox(26, 22, 22, 5), cabCols[q % 6]); cab.position.set(Math.cos(a)*Rw, Math.sin(a)*Rw - 16, 15); wheel.add(cab); cabs.push(cab); }
+        const hub = new THREE.Group(); hub.position.set(sp[0], Rw + 40, sp[1]); hub.rotation.y = RS()*Math.PI; hub.add(wheel); addW(hub);
+        for (const sd of [-1, 1]){ limb3(hub, fr, 5, 5, [0, 0, sd < 0 ? -10 : 40], [-120, -Rw - 40, sd < 0 ? -10 : 40]); limb3(hub, fr, 5, 5, [0, 0, sd < 0 ? -10 : 40], [120, -Rw - 40, sd < 0 ? -10 : 40]); }
+        worldAnims.push(t => { wheel.rotation.z = t*0.12; for (const c of cabs) c.rotation.z = -t*0.12; });
+        shadows(hub, true, false);
+      }
+    }
+  }
 
   // --- thema-decor ---
   const R = rng(42 + k);
@@ -2763,6 +2859,7 @@ function update(dt){
       if (c.rollT > 0){ c.rollT -= dt; if (c.rollT <= 0){ c.rollT = 0; c.item = pickItem(c); c.itemCount = c.item === 'turbo3' ? 3 : 1; c.aiUseT = (['bliksem', 'kopjager', 'spook'].includes(c.item) ? 0.4 : 1 + Math.random()*3)*LV().items; } }
       if (c.ai && c.item){ c.aiUseT -= dt; if (c.aiUseT <= 0){ useItem(c); c.aiUseT = (0.6 + Math.random()*1.5)*LV().items; } }
       for (const p of pads) if (!c.air && (p.x-c.x)**2 + (p.z-c.y)**2 < 45*45 && Math.abs(c.z - p.h) < 25 && c.boostT < 0.8) boost(c, 1.0);
+      for (const gi of gates){ const dd = (c.idx - gi + N) % N; if (dd < 4 && c.lastGate !== gi){ c.lastGate = gi; boost(c, 0.8); } else if (dd > 40 && dd < N - 40 && c.lastGate === gi) c.lastGate = -1; }
     }
     if (itemPressed && state === 'race') useItem(player);
     collisions();
