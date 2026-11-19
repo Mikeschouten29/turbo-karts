@@ -48,6 +48,8 @@
   .card.sel{border-color:#ffeb3b;background:#00000099;transform:scale(1.05)}
   .face{width:54px;height:54px;border-radius:50%;margin:0 auto 6px;border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:30px}
   .card b{display:block;font-size:17px}
+  .cc{display:inline-block;font-size:.72em;font-weight:900;letter-spacing:.04em;padding:1px 4px;border-radius:4px;background:#ffffff26;vertical-align:middle}
+  .card .ln{display:block;font-size:12px;font-weight:700;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .face{overflow:hidden} .face img{width:100%;height:100%;object-fit:cover}
   img.fs{width:1.5em;height:1.5em;border-radius:50%;vertical-align:middle;background:#ffffff30;object-fit:cover}
   .card .cls{font-size:11px;font-weight:800;opacity:.85}
@@ -326,18 +328,18 @@ function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let 
 // Coureurs: gewichtsklasse (licht/middel/zwaar) en een eigen specialiteit
 const CLASSES = { licht: { name: 'Licht', icon: '🪶', mass: 0.82, look: [0.94, 0.9] }, middel: { name: 'Middel', icon: '⚖️', mass: 1, look: [1, 1] }, zwaar: { name: 'Zwaar', icon: '🏋️', mass: 1.3, look: [1.07, 1.2] } };
 const DRIVERS = [
-  { name:'Rocco', color:0xe53935, css:'#e53935', face:'🦊', cls:'middel', top:1.00, acc:1.00, turn:1.00, special:'rocket',       desc:'Allrounder. Raketstart lukt bijna altijd' },
-  { name:'Nova',  color:0x8e24aa, css:'#8e24aa', face:'🦄', cls:'licht',  top:0.97, acc:1.12, turn:1.10, special:'longShield',   desc:'Schild houdt twee keer zo lang' },
-  { name:'Bruno', color:0xfbc02d, css:'#fbc02d', face:'🐻', cls:'zwaar',  top:1.06, acc:0.86, turn:0.90, special:'heavyPush',    desc:'Duwt iedereen opzij' },
-  { name:'Zippy', color:0x1e88e5, css:'#1e88e5', face:'🐝', cls:'licht',  top:0.97, acc:1.10, turn:1.12, special:'driftPro',     desc:'Laadt drift-turbo sneller op' },
-  { name:'Tito',  color:0x43a047, css:'#43a047', face:'🐸', cls:'licht',  top:0.98, acc:1.08, turn:1.06, special:'offroad',      desc:'Racet moeiteloos door gras en zand' },
-  { name:'Mimi',  color:0xec407a, css:'#ec407a', face:'🐱', cls:'middel', top:0.99, acc:1.08, turn:1.04, special:'ballItems',    desc:'Krijgt vaker knalballen' },
-  { name:'Draco', color:0xff6d00, css:'#ff6d00', face:'🐲', cls:'zwaar',  top:1.07, acc:0.88, turn:0.93, special:'longTurbo',    desc:'Turbo\'s duren langer' },
-  { name:'Kiki',  color:0x00bfa5, css:'#00bfa5', face:'🦜', cls:'licht',  top:0.96, acc:1.14, turn:1.08, special:'quickRecover', desc:'Staat snel weer recht na een klap' },
-  { name:'Rex',   color:0x546e7a, css:'#546e7a', face:'🦖', cls:'zwaar',  top:1.08, acc:0.84, turn:0.92, special:'wallTough',    desc:'Kan tegen een stootje (muren)' },
-  { name:'Blitz', color:0xc6ff00, css:'#aeea00', face:'🐆', cls:'middel', top:1.03, acc:0.96, turn:0.98, special:'draft',        desc:'Meester in slipstream' },
-  { name:'Pip',   color:0xeceff1, css:'#cfd8dc', face:'🐭', cls:'licht',  top:0.95, acc:1.18, turn:1.10, special:'turboItems',   desc:'Krijgt vaker turbo\'s' },
-  { name:'Gorgo', color:0x8d6e63, css:'#8d6e63', face:'🦍', cls:'zwaar',  top:1.05, acc:0.90, turn:0.94, special:'shieldStart',  desc:'Start elke race met een schild' },
+  { name:'Luca', last:'Moretti', flag:'ITA', color:0xe53935, css:'#e53935', face:'🦊', cls:'middel', top:1.00, acc:1.00, turn:1.00, special:'rocket',       desc:'Allrounder. Raketstart lukt bijna altijd' },
+  { name:'Nina', last:'Lindqvist', flag:'SWE', color:0x8e24aa, css:'#8e24aa', face:'🦄', cls:'licht',  top:0.97, acc:1.12, turn:1.10, special:'longShield',   desc:'Schild houdt twee keer zo lang' },
+  { name:'Bruno', last:'Kessler', flag:'GER', color:0xfbc02d, css:'#fbc02d', face:'🐻', cls:'zwaar',  top:1.06, acc:0.86, turn:0.90, special:'heavyPush',    desc:'Duwt iedereen opzij' },
+  { name:'Jake', last:'Harper', flag:'GBR', color:0x1e88e5, css:'#1e88e5', face:'🐝', cls:'licht',  top:0.97, acc:1.10, turn:1.12, special:'driftPro',     desc:'Laadt drift-turbo sneller op' },
+  { name:'Theo', last:'Mensah', flag:'GHA', color:0x43a047, css:'#43a047', face:'🐸', cls:'licht',  top:0.98, acc:1.08, turn:1.06, special:'offroad',      desc:'Racet moeiteloos door gras en zand' },
+  { name:'Mia', last:'Tanaka', flag:'JPN', color:0xec407a, css:'#ec407a', face:'🐱', cls:'middel', top:0.99, acc:1.08, turn:1.04, special:'ballItems',    desc:'Krijgt vaker knalballen' },
+  { name:'Diego', last:'Castillo', flag:'MEX', color:0xff6d00, css:'#ff6d00', face:'🐲', cls:'zwaar',  top:1.07, acc:0.88, turn:0.93, special:'longTurbo',    desc:'Turbo\'s duren langer' },
+  { name:'Kaia', last:'Silva', flag:'BRA', color:0x00bfa5, css:'#00bfa5', face:'🦜', cls:'licht',  top:0.96, acc:1.14, turn:1.08, special:'quickRecover', desc:'Staat snel weer recht na een klap' },
+  { name:'Rex', last:'Novak', flag:'CZE', color:0x546e7a, css:'#546e7a', face:'🦖', cls:'zwaar',  top:1.08, acc:0.84, turn:0.92, special:'wallTough',    desc:'Kan tegen een stootje (muren)' },
+  { name:'Felix', last:'Dubois', flag:'FRA', color:0xc6ff00, css:'#aeea00', face:'🐆', cls:'middel', top:1.03, acc:0.96, turn:0.98, special:'draft',        desc:'Meester in slipstream' },
+  { name:'Finn', last:'Doyle', flag:'IRL', color:0xeceff1, css:'#cfd8dc', face:'🐭', cls:'licht',  top:0.95, acc:1.18, turn:1.10, special:'turboItems',   desc:'Krijgt vaker turbo\'s' },
+  { name:'Omar', last:'Haddad', flag:'MAR', color:0x8d6e63, css:'#8d6e63', face:'🦍', cls:'zwaar',  top:1.05, acc:0.90, turn:0.94, special:'shieldStart',  desc:'Start elke race met een schild' },
 ];
 const ITEMS = {
   turbo:  { icon:'🚀', name:'Turbo' },
@@ -1552,18 +1554,18 @@ const bootMat = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6
 const visorDark = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, metalness: 0.85, roughness: 0.08, transparent: true, opacity: 0.62, side: THREE.DoubleSide });
 // Uiterlijk per coureur (zelfde volgorde als DRIVERS): huid, kapsel, haarkleur en accessoires
 const LOOKS = [
-  { skin: 0xf3d2b3, hair: 'quiff',    hairCol: 0x7a5230, acc: [] },                         // Rocco
-  { skin: 0xe0ac69, hair: 'ponytail', hairCol: 0xc04fd0, acc: ['earrings'] },               // Nova
-  { skin: 0xc68642, hair: 'bald',     hairCol: 0x4e342e, acc: ['beard'] },                  // Bruno
-  { skin: 0xffdbac, hair: 'spiky',    hairCol: 0xf2d16b, acc: ['shades'] },                 // Zippy
-  { skin: 0x8d5524, hair: 'afro',     hairCol: 0x1b1b1b, acc: ['headband'] },               // Tito
-  { skin: 0xffe0c8, hair: 'bob',      hairCol: 0xff7eb6, acc: ['catears'] },                // Mimi
-  { skin: 0xd9a07b, hair: 'mohawk',   hairCol: 0xd32f2f, acc: ['goatee'] },                 // Draco
-  { skin: 0xa86b3c, hair: 'buns',     hairCol: 0x00897b, acc: [] },                         // Kiki
-  { skin: 0xc99a6b, hair: 'cap',      hairCol: 0x5d4037, acc: ['stubble'], capCol: 0x37474f },   // Rex
-  { skin: 0xf1c27d, hair: 'slick',    hairCol: 0x4a2c17, acc: ['mustache', 'shades'] },     // Blitz
-  { skin: 0xffe5d0, hair: 'messy',    hairCol: 0xd2691e, acc: ['glasses', 'freckles'] },    // Pip
-  { skin: 0x6b4226, hair: 'long',     hairCol: 0x111111, acc: ['beard'] },                  // Gorgo
+  { skin: 0xf3d2b3, hair: 'quiff',    hairCol: 0x7a5230, acc: [] },                         // Luca Moretti
+  { skin: 0xe0ac69, hair: 'ponytail', hairCol: 0xc04fd0, acc: ['earrings'] },               // Nina Lindqvist
+  { skin: 0xc68642, hair: 'bald',     hairCol: 0x4e342e, acc: ['beard'] },                  // Bruno Kessler
+  { skin: 0xffdbac, hair: 'spiky',    hairCol: 0xf2d16b, acc: ['shades'] },                 // Jake Harper
+  { skin: 0x8d5524, hair: 'afro',     hairCol: 0x1b1b1b, acc: ['headband'] },               // Theo Mensah
+  { skin: 0xffe0c8, hair: 'bob',      hairCol: 0xff7eb6, acc: ['catears'] },                // Mia Tanaka
+  { skin: 0xd9a07b, hair: 'mohawk',   hairCol: 0xd32f2f, acc: ['goatee'] },                 // Diego Castillo
+  { skin: 0xa86b3c, hair: 'buns',     hairCol: 0x00897b, acc: [] },                         // Kaia Silva
+  { skin: 0xc99a6b, hair: 'cap',      hairCol: 0x5d4037, acc: ['stubble'], capCol: 0x37474f },   // Rex Novak
+  { skin: 0xf1c27d, hair: 'slick',    hairCol: 0x4a2c17, acc: ['mustache', 'shades'] },     // Felix Dubois
+  { skin: 0xffe5d0, hair: 'messy',    hairCol: 0xd2691e, acc: ['glasses', 'freckles'] },    // Finn Doyle
+  { skin: 0x6b4226, hair: 'long',     hairCol: 0x111111, acc: ['beard'] },                  // Omar Haddad
 ];
 const eyeGloss = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.12, metalness: 0.35 });
 const PATCH_COLS = [0xffd600, 0xffffff, 0x00b0ff, 0xff1744];
@@ -2127,6 +2129,8 @@ function countdownUI(){
 
 // ================= Portretjes van de coureurs =================
 const PORTRAITS = {};
+const fullName = d => d.name + (d.last ? ' ' + d.last : '');
+const flagOf = d => d.flag ? '<span class="cc">' + d.flag + '</span> ' : '';
 function faceHTML(d, cls = ''){ const src = PORTRAITS[d.name]; return src ? '<img class="' + cls + '" src="' + src + '" alt="">' : d.face; }
 function makePortraits(){
   if (PORTRAITS[DRIVERS[0].name]) return;
@@ -2154,7 +2158,7 @@ function buildMenu(){
   DRIVERS.forEach((d, i) => {
     const taken = net.role && net.roster.some(r => r.d === i && r.id !== net.myId);
     const el = document.createElement('div'); el.className = 'card' + (i === selected ? ' sel' : '') + (taken ? ' taken' : '');
-    el.innerHTML = `<div class="face" style="background:${d.css}">${faceHTML(d)}</div><b>${d.name}</b>${taken ? '<div class="tk">bezet</div>' : ''}`;
+    el.innerHTML = `<div class="face" style="background:${d.css}">${faceHTML(d)}</div><b>${d.name}</b><small class="ln">${flagOf(d)}${d.last || ''}</small>${taken ? '<div class="tk">bezet</div>' : ''}`;
     el.onclick = () => chooseDriver(i);
     box.appendChild(el);
   });
@@ -2172,7 +2176,7 @@ function buildMenu(){
   if (net.role){
     $('onCode').innerHTML = 'Spelcode:<b>' + net.code + '</b>' + (net.role === 'host' ? '<br><small>Geef deze code aan je vrienden, zij kiezen "Meedoen"</small>' : '');
     $('onPlayers').innerHTML = net.roster.map(r => { const d = DRIVERS[r.d] || DRIVERS[0];
-      return `<span class="pl" style="border:2px solid ${d.css}">${faceHTML(d, 'fs')} ${d.name} ${(VEHICLES[r.v] || VEHICLES.kart).icon}${r.id === 'host' ? ' 👑' : ''}${r.id === net.myId ? ' (jij)' : ''}</span>`; }).join('')
+      return `<span class="pl" style="border:2px solid ${d.css}">${faceHTML(d, 'fs')} ${flagOf(d)}${fullName(d)} ${(VEHICLES[r.v] || VEHICLES.kart).icon}${r.id === 'host' ? ' 👑' : ''}${r.id === net.myId ? ' (jij)' : ''}</span>`; }).join('')
       + `<span class="pl" style="opacity:.7">+ ${RACE_SIZE - net.roster.length} computer</span>`;
     $('onHostOpts').hidden = net.role !== 'host'; $('onWait').hidden = net.role !== 'client';
     if (net.role === 'client') $('onWait').textContent = 'Wachten tot de host start… (' + (net.sub === 'cup' ? CUPS[cupSel].emoji + ' ' + CUPS[cupSel].name : '🏁 ' + TRACKS[menuTrack].name) + ' · ' + LV().icon + ' ' + LV().name + ')';
@@ -2266,7 +2270,7 @@ function updateSteps(){
   document.querySelectorAll('.mstep').forEach(sec => sec.hidden = +sec.dataset.step !== menuStep);
   document.querySelectorAll('#steps .step').forEach(b => { const n = +b.dataset.step; b.classList.toggle('cur', n === menuStep); b.classList.toggle('done', n < menuStep); });
   const d = DRIVERS[selected] || DRIVERS[0], V = VEHICLES[vehicle] || VEHICLES.kart;
-  $('stepPick0').innerHTML = faceHTML(d, 'fs') + ' ' + d.name;
+  $('stepPick0').innerHTML = faceHTML(d, 'fs') + ' ' + fullName(d);
   $('stepPick1').textContent = V.icon + ' ' + V.name;
   $('stepPick2').textContent = mode === 'online' ? '🌐' : mode === 'cup' ? '🏆' : '🏁';
   $('backBtn').hidden = menuStep === 0;
@@ -2678,7 +2682,7 @@ function endRace(){
   state = 'done';
   setTimeout(() => { if (state === 'done') showResults(); }, 1800);
 }
-function row(c, i, right){ return `<div class="row ${c.name === player.name ? 'me' : ''}"><span>${i+1}.</span><span class="dot" style="background:${c.css}"></span>${faceHTML(c, 'fs')} ${c.name}<span class="t">${right}</span></div>`; }
+function row(c, i, right){ return `<div class="row ${c.name === player.name ? 'me' : ''}"><span>${i+1}.</span><span class="dot" style="background:${c.css}"></span>${faceHTML(c, 'fs')} ${flagOf(c)}${fullName(c)}<span class="t">${right}</span></div>`; }
 function showResults(){
   const order = ranking(), cup = isCup();
   if (cup) order.forEach((c, i) => cupPts[c.name] = (cupPts[c.name] || 0) + POINTS[i]);
@@ -2747,7 +2751,7 @@ function startPodium(){
     podiumBottles.push({ g: b, k, y: by, side, ph: k*1.9, delay: k*0.25, popped: false });
   });
   podiumCenter = { x: p.x, y: p.h, z: p.y, d, n };
-  $('champ').innerHTML = '🏆 ' + faceHTML(st[0], 'fs') + ' ' + st[0].name + ' is kampioen!';
+  $('champ').innerHTML = '🏆 ' + faceHTML(st[0], 'fs') + ' ' + fullName(st[0]) + ' is kampioen!';
   $('finalList').innerHTML = st.map((d, i) => row(d, i, cupPts[d.name] + ' pnt')).join('');
   $('podium').hidden = false; sfx.fanfare();
 }
