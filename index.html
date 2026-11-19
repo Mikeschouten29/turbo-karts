@@ -1435,7 +1435,7 @@ function updateWeather(dt){
 
 // ================= Deeltjes =================
 const particles = [];
-for (let i = 0; i < 300; i++){
+for (let i = 0; i < 520; i++){
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false, opacity: 0 }));
   s.visible = false; scene.add(s); particles.push({ s, life: 0 });
 }
@@ -2333,6 +2333,7 @@ const sfx = {
   bump: () => beep(90, .15, 'triangle', .12, -40),
   lap: () => [523, 659, 784].forEach((f, i) => beep(f, .18, 'triangle', .1, 0, i*.1)),
   win: () => [523, 659, 784, 1046].forEach((f, i) => beep(f, .3, 'triangle', .1, 0, i*.15)),
+  pop: () => { beep(1400, .05, 'square', .12, -900); beep(160, .25, 'sawtooth', .05, -100, .03); },
   fanfare: () => [523, 523, 523, 659, 784, 659, 784, 1046].forEach((f, i) => beep(f, .25, 'triangle', .1, 0, i*.16)),
   shoot: () => beep(900, .25, 'square', .05, -500),
   splash: () => beep(200, .5, 'sawtooth', .07, -150),
@@ -2732,12 +2733,71 @@ function startPodium(){
       const cup = new THREE.Mesh(new THREE.LatheGeometry(pts, 24), gold); cup.position.set(0, hgt + 48, 0); cup.castShadow = true; g.add(cup); podiumCup = cup;
     }
   });
+  podiumBottles = [];
+  st.slice(0, 3).forEach((dr, k) => {
+    const [lat, hgt] = spots[k], g = onTrack(PI0, lat, 1.2), b = makeBottle();
+    const side = k === 0 ? 0 : (lat < 0 ? 1 : -1);          // de nummers 2 en 3 spuiten richting de winnaar
+    const hz = k === 0 ? 7 : side*-7, by = hgt + 50;
+    b.position.set(9, by, hz); g.add(b); shadows(b, true, false);
+    // arm omhoog die de fles vasthoudt
+    const sm = new THREE.MeshStandardMaterial({ color: dr.color, roughness: 0.55 });
+    const arm = new THREE.Group(); g.add(arm);
+    limb3(arm, sm, 2.1, 1.7, [-1, hgt + 37, hz*0.95], [8, by + 2, hz]);
+    const glove = new THREE.Mesh(sph(2.2, 10), gloveMat); glove.position.set(8.6, by + 3, hz); arm.add(glove);
+    podiumBottles.push({ g: b, k, y: by, side, ph: k*1.9, delay: k*0.25, popped: false });
+  });
   podiumCenter = { x: p.x, y: p.h, z: p.y, d, n };
   $('champ').innerHTML = '🏆 ' + faceHTML(st[0], 'fs') + ' ' + st[0].name + ' is kampioen!';
   $('finalList').innerHTML = st.map((d, i) => row(d, i, cupPts[d.name] + ' pnt')).join('');
   $('podium').hidden = false; sfx.fanfare();
 }
-let podiumCup = null;
+let podiumCup = null, podiumBottles = [];
+// champagnefles (eigen merkloos etiket)
+const bottleGlass = new THREE.MeshStandardMaterial({ color: 0x0f3d1e, metalness: 0.25, roughness: 0.08 });
+const bottleFoil = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.25 });
+const bottleLabel = new THREE.MeshStandardMaterial({ color: 0xf5ecd0, roughness: 0.6 });
+function makeBottle(){
+  const b = new THREE.Group();
+  const pts = [[0,0],[3.2,0],[3.4,0.6],[3.4,11],[3.1,12.6],[1.5,15],[1.25,16],[1.25,21],[1.45,21.4],[0,21.4]].map(([x,y]) => new THREE.Vector2(x, y));
+  b.add(new THREE.Mesh(G('bottleLathe', () => new THREE.LatheGeometry(pts, 18)), bottleGlass));
+  const foil = new THREE.Mesh(G('bottleFoil', () => new THREE.CylinderGeometry(1.45, 1.9, 6.5, 14)), bottleFoil); foil.position.y = 18.4; b.add(foil);
+  const lab = new THREE.Mesh(G('bottleLab', () => new THREE.CylinderGeometry(3.48, 3.48, 5, 18, 1, true)), bottleLabel); lab.position.y = 6.2; b.add(lab);
+  const band = new THREE.Mesh(G('bottleBand', () => new THREE.CylinderGeometry(3.5, 3.5, 0.9, 18, 1, true)), bottleFoil); band.position.y = 9.3; b.add(band);
+  const cork = new THREE.Mesh(G('bottleCork', () => new THREE.CylinderGeometry(1.2, 1.0, 2.4, 10)), new THREE.MeshStandardMaterial({ color: 0xc8a165, roughness: 0.9 })); cork.position.y = 22.4; b.add(cork);
+  b.userData.cork = cork;
+  return b;
+}
+const _bTip = new THREE.Vector3(), _bDir = new THREE.Vector3(), _bQ = new THREE.Quaternion();
+function updateBottles(dt){
+  const cyc = podiumT % 13;                                  // elke 13 s opnieuw schudden en spuiten
+  for (const B of podiumBottles){
+    const g = B.g, t = cyc - B.delay;
+    if (t < 0){ g.rotation.set(0, 0, -0.25); continue; }
+    if (t < 1.7){                                            // schudden
+      g.rotation.set(Math.sin(t*38 + B.ph)*0.28, 0, -0.35 + Math.sin(t*31)*0.15);
+      g.position.y = B.y + Math.abs(Math.sin(t*19))*2.5;
+      B.popped = false; g.userData.cork.visible = true;
+      continue;
+    }
+    g.position.y = B.y;
+    if (!B.popped){ B.popped = true; g.userData.cork.visible = false; if (B.k === 0) sfx.pop();
+      g.userData.cork.getWorldPosition(_bTip); emit(_bTip.x, _bTip.y, _bTip.z, (Math.random()-.5)*60, 320, (Math.random()-.5)*60, 1.4, 3, 3, 0xc8a165, 1, 420); }
+    if (t > 8.5) { g.rotation.z += (-0.25 - g.rotation.z)*Math.min(1, dt*3); g.rotation.x *= 0.95; continue; }
+    // spuiten: fles vooroverkantelen en heen en weer zwaaien
+    const sweep = Math.sin(t*1.7 + B.ph);
+    g.rotation.set(sweep*0.75 + B.side*0.35, 0, -1.05 + Math.sin(t*2.3 + B.ph)*0.25);
+    g.updateMatrixWorld(true);
+    _bTip.set(0, 22, 0); g.localToWorld(_bTip);
+    g.getWorldQuaternion(_bQ); _bDir.set(0, 1, 0).applyQuaternion(_bQ);
+    const power = t < 4 ? 1 : Math.max(0.35, 1 - (t - 4)*0.14);
+    const n = 2 + (Math.random() < 0.5 ? 1 : 0);
+    for (let q = 0; q < n; q++){
+      const v = (230 + Math.random()*110)*power;
+      emit(_bTip.x, _bTip.y, _bTip.z, _bDir.x*v + (Math.random()-.5)*45, _bDir.y*v + (Math.random()-.5)*45, _bDir.z*v + (Math.random()-.5)*45,
+        0.6 + Math.random()*0.45, 3.5, 13 + Math.random()*8, [0xf2c94c, 0xffe08a, 0xfff4cf][Math.floor(Math.random()*3)], 1, 480);
+    }
+  }
+}
 
 function collisions(){
   for (let i = 0; i < cars.length; i++) for (let j = i+1; j < cars.length; j++){
@@ -2812,6 +2872,7 @@ function update(dt){
   if (state === 'podium'){
     podiumT += dt;
     if (podiumCup) podiumCup.rotation.y += dt*1.5;
+    updateBottles(dt);
     if (Math.random() < 0.6){ const c = podiumCenter; emit(c.x + (Math.random()-.5)*300, c.y + 220, c.z + (Math.random()-.5)*300, (Math.random()-.5)*40, -60 - Math.random()*40, (Math.random()-.5)*40, 3.5, 6, 6, new THREE.Color().setHSL(Math.random(), 0.9, 0.6).getHex(), 1); }
     for (const c of cars) if (c.mesh.root.visible) c.hopT = (Math.sin(podiumT*4 + c.phase) > 0.96) ? 0.25 : c.hopT;
     for (const c of cars) c.hopT = Math.max(0, c.hopT - dt);
